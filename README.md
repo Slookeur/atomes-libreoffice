@@ -5,6 +5,28 @@
 
 Extension to insert [atomes][atomes] projet file(s) in any [LibreOffice][libreoffice] document. 
 
+## Install instructions
+
+Download the file [atomes_extension.oxt][atomes_extension] that contains the extension.
+
+### Using [LibreOffice][libreoffice]
+
+Open [LibreOffice][libreoffice], press `Ctrl+Alt+E` (to open the extension manager), then browse to select the file `atomes_extension.oxt` and install. 
+
+### Using the terminal
+
+```[bash]
+unopkg add atomes_extension.oxt
+```
+
+## Remove instructions
+
+### Using the terminal
+
+```[bash]
+unopkg remove atomes_extension.oxt
+```
+ 
 ## Build instructions
 
 To build (package) the extension: 
@@ -50,6 +72,7 @@ This work is still in the testing stage, for the time being [atomes][atomes] pro
   <a href="https://www.ipcms.fr/"><img width="100" src="https://www.ipcms.fr/uploads/2020/09/cropped-dessin_logo_IPCMS_couleur_vectoriel_r%C3%A9%C3%A9quilibr%C3%A9-2.png" alt="IPCMS logo" align="center"></a>
 </p>
 
+[atomes_extension]:https://github.com/Slookeur/atomes-libreoffice/tree/main/atomes_extensio.oxt
 [libreoffice]:https://www.libreoffice.org/
 [license]:https://img.shields.io/badge/License-AGPL_v3%2B-blue
 [dev_status]:https://www.repostatus.org/badges/latest/active.svg

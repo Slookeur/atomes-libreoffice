@@ -36,5 +36,6 @@ cd "$SCRIPT_DIR"
 zip -r "$OUT" META-INF/ description.xml Addons.xcu icons/ python/ pkg-description/ 
 echo ""
 echo "✓ Extension built: ${OUT}"
-echo "To install: unopkg add atomes_extension.oxt"
-echo "To remove : unopkg remove atomes_extension.oxt"
+echo "Install: Tools → Extension Manager → Add …"
+echo "Install using command line: unopkg add atomes_extension.oxt"
+echo "Remove using command line : unopkg remove atomes_extension.oxt"
