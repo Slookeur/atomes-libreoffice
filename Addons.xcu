@@ -12,7 +12,7 @@
           <value xml:lang="en">atomes</value>
         </prop>
         <node oor:name="Submenu">
-	  <!-- Numbering is mandatory in name -->
+          <!-- Numbering is mandatory in name -->
           <node oor:name="Element-001" oor:op="replace">
             <prop oor:name="Title" oor:type="xs:string">
               <value xml:lang="fr">Insérer un fichier</value>
