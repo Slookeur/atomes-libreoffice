@@ -27,6 +27,7 @@ import uno
 import unohelper
 from com.sun.star.awt import XMouseClickHandler, Size
 from com.sun.star.embed import ElementModes
+from com.sun.star.beans import PropertyValue
 from com.sun.star.ui import XContextMenuInterceptor
 from com.sun.star.ui.ContextMenuInterceptorAction import IGNORED, EXECUTE_MODIFIED
 
@@ -106,7 +107,7 @@ def _make_pv(name, value):
 def _event_props(macro_url):
     return (_make_pv("EventType", "Script"), _make_pv("Script", macro_url))
 
-def list_storage(storage, prefix=""):
+def _list_storage(storage, prefix=""):
     try:
         names = storage.getElementNames()
         for name in names:
@@ -117,7 +118,7 @@ def list_storage(storage, prefix=""):
                 if storage.isStorageElement(name):
                     print(f"[DIR ] {full_path}/")
                     sub = storage.openStorageElement(name, ElementModes.READ)
-                    list_storage(sub, full_path + "/")
+                    _list_storage(sub, full_path + "/")
 
                 elif storage.isStreamElement(name):
                     print(f"[FILE] {full_path}")
@@ -129,6 +130,28 @@ def list_storage(storage, prefix=""):
                 pass
     except Exception:
         traceback.print_exc()
+
+
+def _inspect_uno(obj, name="objet"):
+    print(f"\n=== Inspection de {name} ===")
+    print(f"Type : {type(obj)}")
+    
+    print("\nAttributs / Méthodes disponibles :")
+    for attr in sorted(dir(obj)):
+        if attr.startswith('__'):
+            continue
+        try:
+            valeur = getattr(obj, attr)
+            print(f"  {attr:40} : {type(valeur).__name__}")
+        except:
+            print(f"  {attr:40} : <erreur d'accès>")
+    
+    # Si c'est un objet UNO, essayer d'afficher les propriétés
+    if hasattr(obj, "getPropertySetInfo"):
+        print("\nPropriétés UNO :")
+        props = obj.getPropertySetInfo().getProperties()
+        for p in sorted(props, key=lambda x: x.Name):
+            print(f"  - {p.Name} (type: {p.Type.typeClass.value})")
 
 # ══════════════════════════════════════════════════════════════════════
 # Shape selection helpers
@@ -150,6 +173,7 @@ def _get_selected_atomes_shape_from_selection(doc):
         pass
     return None
 
+
 def _get_selected_atomes_shape_from_description(doc, desc):
     try:
         draw_page = _get_draw_page(doc)
@@ -164,13 +188,6 @@ def _get_selected_atomes_shape_from_description(doc, desc):
         pass
     return None
 
-def _stored_name(shape):
-    desc = getattr(shape, "Description", "") or ""
-    if desc.startswith(ATOMES_DESCRIPTION):
-        return desc[len(ATOMES_DESCRIPTION):]
-    return None
-
-
 # ══════════════════════════════════════════════════════════════════════
 # ODF storage
 # ══════════════════════════════════════════════════════════════════════
@@ -184,7 +201,7 @@ def _embed_file(doc, filepath, stored_name, replace=False):
     """
     try:     
         root = doc.getDocumentStorage()
-        list_storage(root)
+        _list_storage(root)
         mode = ElementModes.READWRITE
 
         # Accès / création du sous-stockage
@@ -208,23 +225,24 @@ def _embed_file(doc, filepath, stored_name, replace=False):
         out = stream.getOutputStream()
 
         with open(filepath, "rb") as fh:
-            out.writeBytes(uno.ByteSequence(fh.read()))
+            data = fh.read()
+            out.writeBytes(uno.ByteSequence(data))
 
+        # Fermeture du stream et sauvegarde
         out.closeOutput()
-
-        # Commit obligatoire
-        stream = None
         atomes_storage.commit()
         root.commit()
 
         action = "remplacé" if exists else "ajouté"
         print(f"Fichier {stored_name} {action} avec succès.")
-        list_storage(root)
+        _list_storage(root)
         return True
 
     except Exception as e:
         print(f"Erreur écriture fichier embarqué : {e}")
+        traceback.print_exc()
         return False
+
 
 def _resolve_apf_from_shape(shape):
     name = shape.Name or ""
@@ -233,10 +251,8 @@ def _resolve_apf_from_shape(shape):
         return None
 
     obj_id = name.split("_", 1)[1]
-    print(f"resolve :: {obj_id}")
-
-#    return f"{ATOMES_STORAGE}/{obj_id}"
     return obj_id
+
 
 def _extract_atomes_file(doc, stored_name):
     try:
@@ -272,6 +288,7 @@ def _extract_atomes_file(doc, stored_name):
     except Exception as e:
         traceback.print_exc()
         return None
+
 
 def _list_embedded_files(doc):
     try:
@@ -327,11 +344,11 @@ class AtomesContextMenuInterceptor(unohelper.Base, XContextMenuInterceptor):
 
 
 def _register_handlers(doc):
-    """Register session-level mouse + context-menu handlers (idempotent)."""
+    """Register session-level mouse + context-menu handlers."""
     if doc is None:
         return
     try:
-        key = doc.getURL() or str(id(doc))
+        key = doc.getURL()
         ctrl = doc.getCurrentController()
         if ctrl is None:
             print("Contrôleur introuvable.")
@@ -350,7 +367,6 @@ def _register_handlers(doc):
             except  Exception as e:
                 print(f"Erreur lors de l'ajout de l'intercepteur : {e}")
                 traceback.print_exc()
-
         if key not in _mouse_handlers:
             h = AtomesMouseHandler(doc)
             ctrl.addMouseClickHandler(h)
@@ -360,12 +376,11 @@ def _register_handlers(doc):
        print(f"Erreur dans _register_handlers : {e}")
        traceback.print_exc()
 
-
 # ══════════════════════════════════════════════════════════════════════
 # Core: open an embedded file
 # ══════════════════════════════════════════════════════════════════════
 
-def _open_embedded_file(doc, stored_name, on_click):
+def _open_embedded_file(doc, stored_name, shape):
     if not stored_name:
         _show_message(doc, _("invalid_file_name"), _("error_title"), error=True)
         return
@@ -375,10 +390,6 @@ def _open_embedded_file(doc, stored_name, on_click):
         return
     try:
         # Génère un ID unique pour l'objet
-        if on_click:
-            shape = _get_selected_atomes_shape_from_selection(doc)
-        else:
-            shape = _get_selected_atomes_shape_from_description(doc, stored_name)
         uid = shape.Name.split("_")[-1] if shape else "unknown"
         output_image = f"/tmp/atomes_update_{uid}.png"
         result = subprocess.run(["atomes", "--libreoffice", "--output", output_image, tmp], capture_output=True, text=True)
@@ -406,7 +417,6 @@ def _open_embedded_file(doc, stored_name, on_click):
             _show_message(doc, _("update_failed"), _("error_title"), error=True)
     except Exception as e:
         _show_message(doc, f"{_('open_atomes_failed')}\n{e}", _("error_title"), error=True)
-
 
 # ══════════════════════════════════════════════════════════════════════
 # Selection dialog (multiple embedded files)
@@ -447,6 +457,17 @@ def _selection_dialog(files, doc):
         pass
     return files[0] if files else None
 
+
+def find_all_ole_objects(doc):
+    """Trouve tous les objets OLE présents dans le document."""
+    text = doc.getText()
+    text_enum = text.createEnumeration()
+    ole_objects = []
+    while text_enum.hasMoreElements():
+        element = text_enum.nextElement()
+        if element.supportsService("com.sun.star.text.TextEmbeddedObject"):
+            ole_objects.append(element)
+    return ole_objects
 
 # ══════════════════════════════════════════════════════════════════════
 # Exported macros
@@ -511,7 +532,6 @@ def insert_atomes_file(*args):
                 height_twips = int(height * 1440 / 96)
                 shape.Size = Size(width_twips, height_twips)
         uid               = uuid.uuid4().hex[:12]
-        # f{ATOMES
         unique_name       = f"{uuid.uuid4().hex[:8]}_{apf_basename}"
         shape.Name        = f"{ATOMES_PREFIX}{unique_name}"
         package_url = f"vnd.sun.star.Package:ObjectReplacements/{unique_name}"
@@ -523,11 +543,12 @@ def insert_atomes_file(*args):
             shape.Events.replaceByName("OnClick", _event_props(macro_url))
         except Exception:
             pass
+        draw_page.add(shape)
     except Exception as e:
         _show_message(doc, str(e), _("error_title"), error=True)
+        traceback.print_exc()
         return None
 
-    # Embed .apf in ODF storage
     if not _embed_file(doc, apf_path, unique_name, replace=False):
         _show_message(doc, _("embed_failed"), _("error_title"), error=True)
 
@@ -539,6 +560,15 @@ def insert_atomes_file(*args):
         try: os.unlink(png_path)
         except Exception: pass
 
+    #ole_objects = find_all_ole_objects(doc)
+    #if ole_objects:
+    #    print(f"✅ Trouvé {len(ole_objects)} objet(s) OLE dans le document.")
+    #    for i, obj in enumerate(ole_objects):
+    #        print(f"  Objet {i+1} :")
+    #        print(f"    - Nom : {obj.getPropertyValue('Name')}")
+    #        print(f"    - Lien : {obj.getPropertyValue('URL')}")
+    #else:
+    #    print("❌ Aucun objet OLE trouvé dans le document.")
     return None
 
 
@@ -552,8 +582,14 @@ def open_atomes_file(*args):
         _show_message(doc, _("no_atomes_file"), _("open_title"), error=False)
         return None
     chosen = embedded[0] if len(embedded) == 1 else _selection_dialog(embedded, doc)
-    if chosen:
-        _open_embedded_file(doc, chosen, False)
+    if not chosen:
+        print("No selection was made, nothing to be done ")
+        return None
+    shape = get_selected_atomes_shape_from_description(doc, chosen)
+    if not shape:
+        print("Cannot associate selection to shape")
+        return None
+    _open_embedded_file(doc, chosen, shape)
     return None
 
 
@@ -562,13 +598,18 @@ def on_atomes_click(*args):
     try:
         doc = _get_document()
         if doc is None:
+            print("doc is None")
             return True
+
         shape = _get_selected_atomes_shape_from_selection(doc)
-        if shape:
-#            name = _stored_name(shape)
-            name = _resolve_apf_from_shape(shape)
-            if name:
-                _open_embedded_file(doc, name, True)
+        if not shape:
+            print ("shape is None")
+            return True
+
+        name = _resolve_apf_from_shape(shape)
+        if name:
+            _open_embedded_file(doc, name, shape)
+            
     except Exception as e:
         print(f"Erreur dans on_atomes_click : {e}")
         traceback.print_exc()

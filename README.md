@@ -37,7 +37,7 @@ To build (package) the extension:
 
 ## Dependency for Linux
 
-On Linux Python scripts support is not in the base installation of [LibreOffice][libreoffice], 
+On Linux Python scripts support is not included in the base installation of [LibreOffice][libreoffice], 
 therefore you need to install it: 
 
 ### Debian based Linux:
