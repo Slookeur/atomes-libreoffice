@@ -9,8 +9,7 @@
       <node oor:name="fr.ipcms.atomes.extension.menu" oor:op="replace">
         <prop oor:name="Title" oor:type="xs:string">
           <value xml:lang="fr">atomes</value>
-	  <value xml:lang="en">atomes</value>
-          <value>atomes</value>
+          <value xml:lang="en">atomes</value>
         </prop>
         <node oor:name="Submenu">
 	  <!-- Numbering is mandatory in name -->
