@@ -392,7 +392,7 @@ def _open_embedded_file(doc, stored_name, shape):
         # Génère un ID unique pour l'objet
         uid = shape.Name.split("_")[-1] if shape else "unknown"
         output_image = f"/tmp/atomes_update_{uid}.png"
-        result = subprocess.run(["atomes", "--libreoffice", "--output", output_image, tmp], capture_output=True, text=True)
+        result = subprocess.run(["atomes", "--libreoffice", "-o", output_image, tmp], capture_output=True, text=True)
         #print(f"result.returncode= {result.returncode}")
         #print(f"Sortie d'atomes : {result.stdout}")
         #print(f"Erreur d'atomes : {result.stderr}")
@@ -502,7 +502,7 @@ def insert_atomes_file(*args):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False, prefix="atomes_") as tmp:
             png_path = tmp.name
         result = subprocess.run(
-            ["atomes", "--render-png", apf_path, "--output", png_path],
+            ["atomes", "--render-png", apf_path, "-o", png_path],
             timeout=120, capture_output=True)
         if result.returncode == 0 and os.path.exists(png_path) and os.path.getsize(png_path) > 0:
             image_ok = True
