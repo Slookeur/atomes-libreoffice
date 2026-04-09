@@ -11,8 +11,10 @@ from atomes_i18n import _
 from atomes_extension import (
     _lo_ctx, _get_document, _show_message, _get_all_atomes_shapes,
     _get_file_map, _set_file_map, _get_storage_mode, _set_storage_mode,
+    _get_internal_mode, _set_internal_mode,
     _extract_atomes_file_persistent, _remove_embedded_file_persistent,
-    _embed_file_persistent, ATOMES_LINK_PREFIX, ATOMES_EMBED_PREFIX
+    _embed_file_persistent, ATOMES_LINK_PREFIX, ATOMES_EMBED_PREFIX,
+    _create_dialog_object, _create_dialog_model, _create_dialog
 )
 
 
@@ -133,14 +135,80 @@ class _RadioToggleListener(unohelper.Base, XItemListener):
     def disposing(self, source):
         pass
 
-def create_dialog_object(dm, instance, x_pos, y_pos, width, height, label):
-    dobj = dm.createInstance(instance)
-    dobj.PositionX = x_pos
-    dobj.PositionY = y_pos
-    dobj.Width = width
-    dobj.Height = height
-    dobj.Label = _(label)
-    return dobj
+
+from com.sun.star.awt import XActionListener
+
+class AdvancedActionListener(unohelper.Base, XActionListener):
+    def __init__(self, doc):
+        self.doc = doc
+
+    def actionPerformed(self, event):
+        show_advanced_dialog(self.doc)
+
+    def disposing(self, source):
+        pass
+
+
+def show_advanced_dialog(doc):
+    ctx = _lo_ctx()
+    smgr = ctx.ServiceManager
+    current = _get_internal_mode(doc)
+    dm = _create_dialog_model(smgr, 190, 130, "Stockage Interne Avancé")
+
+    rb_props = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_props", 10, 10, 170, 14, "Propriétés du Document (Recommandé)")
+    rb_props.State = 1 if current == "properties" else 0
+
+    lbl_p = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_p", 20, 25, 160, 24, "Sécurisé et natif. Recommandé pour des fichiers très légers (moins de quelques Mo).")
+    lbl_p.MultiLine = True
+
+    rb_zip = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_zip", 10, 55, 170, 14, "Archive ODF (ZIP) post-sauvegarde")
+    rb_zip.State = 1 if current == "zip" else 0
+
+    lbl_z = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_z", 20, 70, 160, 24, "Idéal pour les fichiers massifs. Hack de l'archive ZIP après la sauvegarde.")
+    lbl_z.MultiLine = True
+
+    btn_cancel = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_cancel", 30, 105, 50, 18, "cancel")
+    btn_cancel.PushButtonType = 2
+
+    btn_ok = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_ok", 110, 105, 50, 18, "options_apply")
+    btn_ok.PushButtonType = 1
+
+    dlg = _create_dialog(smgr, dm)
+    ctrl_p = dlg.getControl("rb_props")
+    ctrl_z = dlg.getControl("rb_zip")
+    ctrl_p.addItemListener(_RadioToggleListener(ctrl_z))
+    ctrl_z.addItemListener(_RadioToggleListener(ctrl_p))
+
+    if dlg.execute() == 1:
+        new_mode = "properties" if ctrl_p.getState() else "zip"
+        dlg.dispose()
+        if new_mode != current:
+            _convert_internal_data(doc, new_mode)
+    else:
+        dlg.dispose()
+
+
+def _convert_internal_data(doc, new_mode):
+    old_mode = _get_internal_mode(doc)
+    _set_internal_mode(doc, new_mode)
+    shapes = _get_all_atomes_shapes(doc)
+    count = 0
+    for shape in shapes:
+        unique_name = shape.Name.split("_", 1)[1] if "_" in shape.Name else None
+        if not unique_name: continue
+
+        _set_internal_mode(doc, old_mode)
+        tmp = _extract_atomes_file_persistent(doc, unique_name)
+        if not tmp: continue
+        _remove_embedded_file_persistent(doc, unique_name)
+
+        _set_internal_mode(doc, new_mode)
+        _embed_file_persistent(doc, tmp, unique_name)
+        os.unlink(tmp)
+        count += 1
+    
+    if count > 0:
+        _show_message(doc, f"Migration interne terminée avec {count} fichiers.", "Succès")
 
 
 def show_options_dialog(*args):
@@ -153,58 +221,53 @@ def show_options_dialog(*args):
     ctx = _lo_ctx()
     smgr = ctx.ServiceManager
 
-    # ── Construction du dialogue ──
-    dm = smgr.createInstance("com.sun.star.awt.UnoControlDialogModel")
-    dm.Width = 180;
-    dm.Height = 140
-    dm.Title = _("options_title")
+    dm = _create_dialog_model(smgr, 180, 160, "options_title")
 
     # Label titre
-    lbl = create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", 12, 10, 130, 14, "options_mode_label")
+    lbl = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_title", 12, 10, 130, 14, "options_mode_label")
     lbl.FontWeight = 150  # gras
-    dm.insertByName("lbl_title", lbl)
 
     # Radio bouton : liens externes
-    rb_ext = create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", 16, 30, 140, 14, "options_external")
+    rb_ext = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_external", 16, 30, 140, 14, "options_external")
     rb_ext.State = 1 if current_mode == "external" else 0
-    dm.insertByName("rb_external", rb_ext)
 
     # Description liens
-    lbl_ext = create_dialog_object (dm, "com.sun.star.awt.UnoControlFixedTextModel", 30, 44, 140, 22, "options_external_desc")
+    lbl_ext = _create_dialog_object (dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_ext_desc", 30, 44, 140, 22, "options_external_desc")
     lbl_ext.MultiLine = True
-    dm.insertByName("lbl_ext_desc", lbl_ext)
 
     # Radio bouton : stockage interne
-    rb_int = create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", 16, 74, 140, 14, "options_internal")
+    rb_int = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_internal", 16, 74, 140, 14, "options_internal")
     rb_int.State = 1 if current_mode == "internal" else 0
-    dm.insertByName("rb_internal", rb_int)
 
     # Description interne
-    lbl_int = create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", 30, 88, 140, 22, "options_internal_desc")
+    lbl_int = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_int_desc", 30, 88, 140, 22, "options_internal_desc")
     lbl_int.MultiLine = True
-    dm.insertByName("lbl_int_desc", lbl_int)
+
+    # Bouton Avancé
+    btn_adv = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_advanced", 16, 115, 60, 18, "Avancé...")
+    btn_adv.Enabled = True
 
     # Bouton Annuler
-    btn_cancel = create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", 15, 115, 64, 18, "cancel")
+    btn_cancel = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_cancel", 15, 138, 64, 18, "cancel")
     btn_cancel.PushButtonType = 2  # CANCEL
-    dm.insertByName("btn_cancel", btn_cancel)
 
     # Bouton Appliquer
-    btn_apply = create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", 105, 115, 64, 18, "options_apply")
+    btn_apply = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_apply", 105, 138, 64, 18, "options_apply")
     btn_apply.PushButtonType = 1  # OK
-    dm.insertByName("btn_apply", btn_apply)
 
     # ── Affichage du dialogue ──
-    dlg = smgr.createInstance("com.sun.star.awt.UnoControlDialog")
-    dlg.setModel(dm)
-    tk = smgr.createInstance("com.sun.star.awt.Toolkit")
-    dlg.createPeer(tk, None)
+    dlg = _create_dialog(smgr, dm)
 
     # ── Connexion des radio buttons via XItemListener ──
     ctrl_ext = dlg.getControl("rb_external")
     ctrl_int = dlg.getControl("rb_internal")
     ctrl_ext.addItemListener(_RadioToggleListener(ctrl_int))
     ctrl_int.addItemListener(_RadioToggleListener(ctrl_ext))
+
+    # Connecter le bouton Avancé
+    btn_adv_ctrl = dlg.getControl("btn_advanced")
+    btn_adv_listener = AdvancedActionListener(doc)
+    btn_adv_ctrl.addActionListener(btn_adv_listener)
 
     if dlg.execute() == 1:  # Appliquer
         new_mode = "external" if dlg.getControl("rb_external").getState() else "internal"

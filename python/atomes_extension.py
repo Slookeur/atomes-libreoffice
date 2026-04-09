@@ -26,6 +26,10 @@ import tempfile
 import uuid
 import uno
 import unohelper
+import zlib
+import base64
+import zipfile
+import shutil
 from com.sun.star.awt import XMouseClickHandler, XItemListener, Size
 from com.sun.star.embed import ElementModes
 from com.sun.star.beans import PropertyValue
@@ -52,14 +56,15 @@ ATOMES_PERSISTENT_STORAGE = "AtomesFiles"      # Dossier ODF dédié (non géré
 ATOMES_EMBED_PREFIX       = "AtomesEmbed:"      # Préfixe Description : mode interne
 ATOMES_LINK_PREFIX        = "AtomesLink:"        # Préfixe Description : mode liens
 ATOMES_MODE_PROP          = "AtomesStorageMode"  # Propriété document : "internal"/"external"
+ATOMES_INTERNAL_MODE_PROP = "AtomesInternalMode" # Propriété document : "properties"/"zip"
 ATOMES_MAP_PROP           = "AtomesFileMap"      # Propriété document : JSON {name: path}
 
 # Session-level references (prevent GC)
 _mouse_handlers   = {}
 _ctx_interceptors = {}
-# ── Caches session ajoutés pour le stockage pérenne ──
+# ── Caches session ajoutés pour le stockage pérenne (mode zip) ──
 _atomes_file_cache = {}   # {doc_url: {stored_name: bytes_data}}
-_save_listeners    = {}   # {doc_url: AtomesSaveListener}
+_post_save_listeners = {} # {doc_url: AtomesPostSaveListener}
 
 # ══════════════════════════════════════════════════════════════════════
 # Low-level helpers
@@ -80,6 +85,35 @@ def _get_document():
         return desktop.getCurrentComponent()
     except Exception:
         return None
+
+
+def _create_dialog_object(dm, instance, name, x_pos, y_pos, width, height, label):
+    dobj = dm.createInstance(instance)
+    dobj.PositionX = x_pos
+    dobj.PositionY = y_pos
+    dobj.Width = width
+    dobj.Height = height
+    if name is not None:
+        dm.insertByName(name, dobj)
+    if label is not None:
+        dobj.Label = _(label)
+    return dobj
+
+
+def _create_dialog_model(smgr, width, height, title):
+    dmodel = smgr.createInstance("com.sun.star.awt.UnoControlDialogModel")
+    dmodel.Width = width
+    dmodel.Height = height
+    dmodel.Title = _(title)
+    return dmodel
+
+
+def _create_dialog(smgr, dm):
+    dlg = smgr.createInstance("com.sun.star.awt.UnoControlDialog")
+    dlg.setModel(dm)
+    tk = smgr.createInstance("com.sun.star.awt.Toolkit")
+    dlg.createPeer(tk, None)
+    return dlg
 
 
 def _get_draw_page(doc):
@@ -318,193 +352,250 @@ def _list_embedded_files(doc):
 # Stockage pérenne — Fonctions ajoutées
 # ══════════════════════════════════════════════════════════════════════
 
-# ── Écouteur de sauvegarde : réinjecte les fichiers avant chaque save ──
-class AtomesSaveListener(unohelper.Base, XDocumentEventListener):
-    """Réinjecte les fichiers en cache dans le stockage ODF avant chaque
-    sauvegarde du document, garantissant la persistance des fichiers .apf."""
-
-    def __init__(self, doc):
-        self.doc = doc
-
-    # ── Interface XDocumentEventListener ──
-    def documentEventOccured(self, event):
-        ename = event.EventName
-        # Réinjection AVANT la sauvegarde effective
-        if ename in ("OnSave", "OnSaveAs"):
-            self._reinject_cache()
-
-    def disposing(self, source):
-        pass
-
-    def _reinject_cache(self):
-        """Réécrit tous les fichiers en cache dans le stockage AtomesFiles."""
-        try:
-            key = self.doc.getURL()
-            cache = _atomes_file_cache.get(key, {})
-            if not cache:
-                return
-            root = self.doc.getDocumentStorage()
-            mode = ElementModes.READWRITE
-            storage = root.openStorageElement(ATOMES_PERSISTENT_STORAGE, mode)
-            for stored_name, data in cache.items():
-                smode = mode | ElementModes.TRUNCATE if storage.hasByName(stored_name) else mode
-                stream = storage.openStreamElement(stored_name, smode)
-                out = stream.getOutputStream()
-                out.writeBytes(uno.ByteSequence(data))
-                out.closeOutput()
-            storage.commit()
-            root.commit()
-            print(f"[AtomesSaveListener] {len(cache)} fichier(s) réinjecté(s) avant sauvegarde.")
-        except Exception as e:
-            print(f"[AtomesSaveListener] Erreur réinjection : {e}")
-            traceback.print_exc()
-
-
-def _register_save_listener(doc):
-    """Enregistre l'écouteur de sauvegarde sur le document (une seule fois)."""
-    try:
-        key = doc.getURL()
-        if key in _save_listeners:
-            return
-        listener = AtomesSaveListener(doc)
-        doc.addDocumentEventListener(listener)
-        _save_listeners[key] = listener
-        print("[Persistent] Save listener enregistré.")
-    except Exception as e:
-        print(f"[Persistent] Erreur enregistrement save listener : {e}")
-        traceback.print_exc()
-
+# ══════════════════════════════════════════════════════════════════════
+# Stockage pérenne — Fonctions de routage (Propriétés vs ZIP)
+# ══════════════════════════════════════════════════════════════════════
 
 def _embed_file_persistent(doc, filepath, stored_name, replace=False):
-    """
-    Stockage pérenne : écrit un fichier dans le sous-dossier 'AtomesFiles'
-    du stockage ODF, met en cache les données et enregistre un écouteur
-    de sauvegarde pour garantir la persistance.
+    """Route l'embarquement vers _properties ou _zip."""
+    mode = _get_internal_mode(doc)
+    if mode == "properties":
+        return _embed_file_properties(doc, filepath, stored_name, replace)
+    else:
+        return _embed_file_zip(doc, filepath, stored_name, replace)
 
-    Signature identique à _embed_file → interchangeable par commentaire.
-    - replace=False → création (embed)
-    - replace=True  → remplacement uniquement si existant
-    """
+
+def _extract_atomes_file_persistent(doc, stored_name):
+    """Route l'extraction vers _properties ou _zip."""
+    mode = _get_internal_mode(doc)
+    if mode == "properties":
+        return _extract_file_properties(doc, stored_name)
+    else:
+        return _extract_file_zip(doc, stored_name)
+
+
+def _list_embedded_files_persistent(doc):
+    """Route le listage vers _properties ou _zip."""
+    mode = _get_internal_mode(doc)
+    if mode == "properties":
+        return _list_files_properties(doc)
+    else:
+        return _list_files_zip(doc)
+
+
+def _remove_embedded_file_persistent(doc, stored_name):
+    """Route la suppression vers _properties ou _zip."""
+    mode = _get_internal_mode(doc)
+    if mode == "properties":
+        return _remove_file_properties(doc, stored_name)
+    else:
+        return _remove_file_zip(doc, stored_name)
+
+
+# ── IMPLÉMENTATION : PROPRIÉTÉS DOCUMENT (Recommandé, simple) ──
+
+def _embed_file_properties(doc, filepath, stored_name, replace=False):
+    try:
+        with open(filepath, "rb") as fh:
+            data = fh.read()
+        b64_data = base64.b64encode(zlib.compress(data, level=9)).decode('ascii')
+        udp = _get_user_props(doc)
+        psi = udp.getPropertySetInfo()
+        prop_name = f"Apf_{stored_name}"
+        if psi.hasPropertyByName(prop_name):
+            if not replace: return False
+            udp.setPropertyValue(prop_name, b64_data)
+        else:
+            udp.addProperty(prop_name, 0, b64_data)
+        return True
+    except Exception as e:
+        print(f"[Properties] Erreur embed : {e}")
+        traceback.print_exc()
+        return False
+
+def _extract_file_properties(doc, stored_name):
+    try:
+        udp = _get_user_props(doc)
+        psi = udp.getPropertySetInfo()
+        prop_name = f"Apf_{stored_name}"
+        if not psi.hasPropertyByName(prop_name):
+            return None
+        b64_data = udp.getPropertyValue(prop_name)
+        data = zlib.decompress(base64.b64decode(b64_data.encode('ascii')))
+        with tempfile.NamedTemporaryFile(suffix=".apf", delete=False) as tmp:
+            tmp.write(data)
+            return tmp.name
+    except Exception as e:
+        print(f"[Properties] Erreur extract : {e}")
+        traceback.print_exc()
+        return None
+
+def _list_files_properties(doc):
+    try:
+        udp = _get_user_props(doc)
+        return [p.Name[4:] for p in udp.getPropertySetInfo().getProperties() if p.Name.startswith("Apf_")]
+    except Exception:
+        return []
+
+def _remove_file_properties(doc, stored_name):
+    try:
+        udp = _get_user_props(doc)
+        prop_name = f"Apf_{stored_name}"
+        if udp.getPropertySetInfo().hasPropertyByName(prop_name):
+            udp.removeProperty(prop_name)
+            return True
+        return False
+    except Exception:
+        return False
+
+
+# ── IMPLÉMENTATION : ARCHIVE ZIP POST-SAVE (Fichiers lourds) ──
+
+def update_zip_reliable(path, new_files_dict):
+    """Méthode robuste d'injection ZIP post sauvegarde."""
+    import zipfile, os, shutil
+    tmp_path = path + ".tmp.zip"
+    try:
+        with zipfile.ZipFile(path, 'r') as zin, zipfile.ZipFile(tmp_path, 'w') as zout:
+            manifest_data = None
+            if 'META-INF/manifest.xml' in zin.namelist():
+                manifest_data = zin.read('META-INF/manifest.xml').decode('utf-8')
+            
+            for item in zin.infolist():
+                if item.filename in new_files_dict or item.filename == 'META-INF/manifest.xml':
+                    continue
+                zout.writestr(item, zin.read(item.filename))
+            
+            for fname, fcontent in new_files_dict.items():
+                zout.writestr(fname, fcontent)
+                
+            if manifest_data:
+                # Injection rapide des entrées manquantes dans le XML du manifest
+                for fname in new_files_dict.keys():
+                    entry_tag = f'<manifest:file-entry manifest:full-path="{fname}" manifest:media-type="application/vnd.atomes.apf"/>'
+                    if entry_tag not in manifest_data:
+                        manifest_data = manifest_data.replace('</manifest:manifest>', f' {entry_tag}\n</manifest:manifest>')
+                zout.writestr('META-INF/manifest.xml', manifest_data.encode('utf-8'))
+        shutil.move(tmp_path, path)
+    except Exception as e:
+        print(f"[ZIP] Erreur d'injection : {e}")
+        traceback.print_exc()
+        if os.path.exists(tmp_path):
+            try: os.unlink(tmp_path)
+            except: pass
+
+class AtomesPostSaveListener(unohelper.Base, XDocumentEventListener):
+    def __init__(self, doc):
+        self.doc = doc
+    def documentEventOccured(self, event):
+        ename = event.EventName
+        if ename in ("OnSaveDone", "OnSaveAsDone"):
+            try:
+                key = self.doc.getURL()
+                cache = _atomes_file_cache.get(key, {})
+                if not cache: return
+                p_path = uno.fileUrlToSystemPath(key)
+                if not os.path.exists(p_path): return
+                zip_dict = {f"{ATOMES_PERSISTENT_STORAGE}/{name}": data for name, data in cache.items()}
+                print(f"[ZIP] Injection post-save de {len(zip_dict)} fichier(s) dans {p_path}...")
+                update_zip_reliable(p_path, zip_dict)
+            except Exception as e:
+                print(f"[ZIP] Erreur listener : {e}")
+    def disposing(self, source): pass
+
+def _register_post_save_listener(doc):
+    try:
+        key = doc.getURL()
+        if key not in _post_save_listeners:
+            listener = AtomesPostSaveListener(doc)
+            doc.addDocumentEventListener(listener)
+            _post_save_listeners[key] = listener
+    except Exception: pass
+
+def _embed_file_zip(doc, filepath, stored_name, replace=False):
+    """Mise en cache du fichier, sera injecté par le PostSaveListener ET écrit immédiatement en mémoire."""
     try:
         root = doc.getDocumentStorage()
         mode = ElementModes.READWRITE
-
-        # Accès / création du sous-stockage pérenne
         if not root.hasByName(ATOMES_PERSISTENT_STORAGE):
-            if replace:
-                print("[Persistent] Storage inexistant, impossible de remplacer.")
-                return False
-
-        storage = root.openStorageElement(ATOMES_PERSISTENT_STORAGE, mode)
-
-        exists = storage.hasByName(stored_name)
-        if replace and not exists:
-            print(f"[Persistent] Fichier {stored_name} introuvable pour remplacement.")
-            return False
-
-        # Lecture du fichier source
+            if replace: return False
         with open(filepath, "rb") as fh:
             data = fh.read()
-
-        # Écriture dans le stockage
-        smode = mode | ElementModes.TRUNCATE if exists else mode
+        storage = root.openStorageElement(ATOMES_PERSISTENT_STORAGE, mode)
+        smode = mode | ElementModes.TRUNCATE if storage.hasByName(stored_name) else mode
         stream = storage.openStreamElement(stored_name, smode)
         out = stream.getOutputStream()
         out.writeBytes(uno.ByteSequence(data))
         out.closeOutput()
-
         storage.commit()
         root.commit()
-
-        # ── Mise en cache pour réinjection au save ──
+        
         key = doc.getURL()
-        if key not in _atomes_file_cache:
-            _atomes_file_cache[key] = {}
+        if key not in _atomes_file_cache: _atomes_file_cache[key] = {}
         _atomes_file_cache[key][stored_name] = data
-
-        # ── Enregistrement de l'écouteur de sauvegarde ──
-        _register_save_listener(doc)
-
-        action = "remplacé" if exists else "ajouté"
-        print(f"[Persistent] Fichier {stored_name} {action} avec succès.")
+        _register_post_save_listener(doc)
         return True
-
     except Exception as e:
-        print(f"[Persistent] Erreur écriture fichier : {e}")
-        traceback.print_exc()
+        print(f"[ZIP] Erreur embed cache : {e}")
         return False
 
-
-def _extract_atomes_file_persistent(doc, stored_name):
-    """Extrait un fichier depuis le stockage pérenne AtomesFiles."""
+def _extract_file_zip(doc, stored_name):
+    """Lecture du fichier depuis le Storage LO ou le cache."""
     try:
-        root = doc.getDocumentStorage()
-        if not root.hasByName(ATOMES_PERSISTENT_STORAGE):
-            print("[Persistent] Pas de stockage AtomesFiles.")
-            return None
-        storage = root.openStorageElement(ATOMES_PERSISTENT_STORAGE, ElementModes.READ)
-        if not storage.hasByName(stored_name):
-            print(f"[Persistent] Fichier {stored_name} introuvable.")
-            return None
-        stream = storage.openStreamElement(stored_name, ElementModes.READ)
-        inp = stream.getInputStream()
-        chunks = []
-        buf_ref = uno.ByteSequence(b"\x00" * 65536)
-        while True:
-            n, chunk = inp.readBytes(buf_ref, 65536)
-            if n == 0:
-                break
-            chunks.append(bytes(chunk))
-        inp.closeInput()
-
-        # ── Met à jour le cache session ──
         key = doc.getURL()
-        if key not in _atomes_file_cache:
-            _atomes_file_cache[key] = {}
-        _atomes_file_cache[key][stored_name] = b"".join(chunks)
+        data = None
+        if key in _atomes_file_cache and stored_name in _atomes_file_cache[key]:
+            data = _atomes_file_cache[key][stored_name]
+        else:
+            root = doc.getDocumentStorage()
+            if not root.hasByName(ATOMES_PERSISTENT_STORAGE): return None
+            storage = root.openStorageElement(ATOMES_PERSISTENT_STORAGE, ElementModes.READ)
+            if not storage.hasByName(stored_name): return None
+            stream = storage.openStreamElement(stored_name, ElementModes.READ)
+            inp = stream.getInputStream()
+            chunks = []
+            buf_ref = uno.ByteSequence(b"\x00" * 65536)
+            while True:
+                n, chunk = inp.readBytes(buf_ref, 65536)
+                if n == 0: break
+                chunks.append(bytes(chunk))
+            inp.closeInput()
+            data = b"".join(chunks)
+            if key not in _atomes_file_cache: _atomes_file_cache[key] = {}
+            _atomes_file_cache[key][stored_name] = data
+            _register_post_save_listener(doc)
 
         with tempfile.NamedTemporaryFile(suffix=".apf", delete=False) as tmp:
-            for c in chunks:
-                tmp.write(c)
+            tmp.write(data)
             return tmp.name
     except Exception as e:
-        print(f"[Persistent] Erreur extraction : {e}")
-        traceback.print_exc()
+        print(f"[ZIP] Erreur extract : {e}")
         return None
 
-
-def _list_embedded_files_persistent(doc):
-    """Liste les fichiers .apf dans le stockage pérenne AtomesFiles."""
+def _list_files_zip(doc):
     try:
         root = doc.getDocumentStorage()
-        if not root.hasByName(ATOMES_PERSISTENT_STORAGE):
-            return []
+        if not root.hasByName(ATOMES_PERSISTENT_STORAGE): return []
         storage = root.openStorageElement(ATOMES_PERSISTENT_STORAGE, ElementModes.READ)
         return [n for n in storage.getElementNames() if n.endswith(".apf")]
     except Exception:
         return []
 
-
-def _remove_embedded_file_persistent(doc, stored_name):
-    """Supprime un fichier du stockage pérenne AtomesFiles."""
+def _remove_file_zip(doc, stored_name):
     try:
         root = doc.getDocumentStorage()
-        if not root.hasByName(ATOMES_PERSISTENT_STORAGE):
-            return False
+        if not root.hasByName(ATOMES_PERSISTENT_STORAGE): return False
         storage = root.openStorageElement(ATOMES_PERSISTENT_STORAGE, ElementModes.READWRITE)
         if storage.hasByName(stored_name):
             storage.removeElement(stored_name)
             storage.commit()
             root.commit()
-            # Supprime du cache
             key = doc.getURL()
             if key in _atomes_file_cache and stored_name in _atomes_file_cache[key]:
                 del _atomes_file_cache[key][stored_name]
             return True
         return False
-    except Exception as e:
-        print(f"[Persistent] Erreur suppression {stored_name} : {e}")
-        traceback.print_exc()
+    except Exception:
         return False
 
 
@@ -540,6 +631,32 @@ def _set_storage_mode(doc, mode):
             udp.addProperty(ATOMES_MODE_PROP, 0, mode)
     except Exception as e:
         print(f"Erreur _set_storage_mode : {e}")
+        traceback.print_exc()
+
+
+def _get_internal_mode(doc):
+    """Retourne le sous-mode interne : 'properties' (défaut) ou 'zip'."""
+    try:
+        udp = _get_user_props(doc)
+        psi = udp.getPropertySetInfo()
+        if psi.hasPropertyByName(ATOMES_INTERNAL_MODE_PROP):
+            return udp.getPropertyValue(ATOMES_INTERNAL_MODE_PROP)
+    except Exception:
+        pass
+    return "properties"
+
+
+def _set_internal_mode(doc, mode):
+    """Définit le sous-mode interne ('properties' ou 'zip')."""
+    try:
+        udp = _get_user_props(doc)
+        psi = udp.getPropertySetInfo()
+        if psi.hasPropertyByName(ATOMES_INTERNAL_MODE_PROP):
+            udp.setPropertyValue(ATOMES_INTERNAL_MODE_PROP, mode)
+        else:
+            udp.addProperty(ATOMES_INTERNAL_MODE_PROP, 0, mode)
+    except Exception as e:
+        print(f"Erreur _set_internal_mode : {e}")
         traceback.print_exc()
 
 
@@ -599,7 +716,6 @@ def atomes_output (result):
 # ══════════════════════════════════════════════════════════════════════
 
 from atomes_options import show_options_dialog
-
 
 # ══════════════════════════════════════════════════════════════════════
 # Ouverture dispatch selon le mode — Fonction ajoutée
@@ -809,28 +925,19 @@ def _open_embedded_file(doc, stored_name, shape):
 def _selection_dialog(files, doc):
     try:
         ctx = _lo_ctx()
-        dm  = ctx.ServiceManager.createInstance("com.sun.star.awt.UnoControlDialogModel")
-        dm.Width = 250; dm.Height = 130; dm.Title = _("select_atomes_title")
+        smgr = ctx.ServiceManager
+        dm = _create_dialog_model(smgr, 250, 130, "select_atomes_title")
 
-        lbl = dm.createInstance("com.sun.star.awt.UnoControlFixedTextModel")
-        lbl.PositionX = 8; lbl.PositionY = 8; lbl.Width = 234; lbl.Height = 24
-        lbl.Label = _("select_atomes_label"); lbl.MultiLine = True
-        dm.insertByName("lbl", lbl)
+        lbl = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl", 8, 8, 234, 24, "select_atomes_label")
+        lbl.MultiLine = True
 
-        lb = dm.createInstance("com.sun.star.awt.UnoControlListBoxModel")
-        lb.PositionX = 8; lb.PositionY = 36; lb.Width = 234; lb.Height = 60
+        lb = _create_dialog_object(dm, "com.sun.star.awt.UnoControlListBoxModel", "lb", 8, 36, 234, 60, None)
         lb.StringItemList = tuple(files); lb.SelectedItems = (0,)
-        dm.insertByName("lb", lb)
 
-        btn = dm.createInstance("com.sun.star.awt.UnoControlButtonModel")
-        btn.PositionX = 170; btn.PositionY = 110; btn.Width = 72; btn.Height = 16
-        btn.Label = _("ok"); btn.PushButtonType = 1
-        dm.insertByName("btn", btn)
+        btn = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn", 170, 110, 72, 16, "ok")
+        btn.PushButtonType = 1
 
-        dlg = ctx.ServiceManager.createInstance("com.sun.star.awt.UnoControlDialog")
-        dlg.setModel(dm)
-        tk = ctx.ServiceManager.createInstance("com.sun.star.awt.Toolkit")
-        dlg.createPeer(tk, None)
+        dlg = _create_dialog(smgr, dm)
 
         if dlg.execute() == 1:
             idx = dlg.getControl("lb").getSelectedItemPos()
