@@ -54,8 +54,7 @@ sudo dnf install libreoffice-pyuno
 
 ## Beta version
 
-This work is still in the testing stage, for the time being [atomes][atomes] project files cannot be stored in the ODF. 
-
+This work is in progress !
 
 ## Who's behind ***atomes*** (and this extension)
 
