@@ -33,7 +33,7 @@ echo "=== atomes LibreOffice Extension — Build ==="
 echo "→ Building ${OUT} …"
 rm -f "$OUT"
 cd "$SCRIPT_DIR"
-zip -r "$OUT" META-INF/ description.xml Addons.xcu icons/ python/ pkg-description/ 
+zip -r "$OUT" META-INF/ description.xml Addons.xcu Jobs.xcu icons/ python/ pkg-description/ 
 echo ""
 echo "✓ Extension built: ${OUT}"
 echo "Install: Tools → Extension Manager → Add …"

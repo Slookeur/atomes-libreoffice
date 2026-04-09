@@ -24,6 +24,24 @@ STRINGS = {
         "image_update_failed": "Impossible de mettre à jour l'illustration",
         "ok":                  "OK",
         "cancel":              "Annuler",
+        # ── Chaînes ajoutées pour le dialogue d'options et le stockage pérenne ──
+        "options_title":         "Options — Extension atomes",
+        "options_mode_label":    "Mode de stockage des fichiers atomes :",
+        "options_external":      "Liens externes (fichiers sur le disque dur)",
+        "options_external_desc": "Les fichiers .apf restent sur le disque.\nLe document contient uniquement des liens.",
+        "options_internal":      "Stockage interne (embarqué dans le document)",
+        "options_internal_desc": "Les fichiers .apf sont intégrés dans\nle document LibreOffice.",
+        "options_apply":         "Appliquer",
+        "options_converting":    "Conversion en cours…",
+        "options_select_folder": "Sélectionnez un dossier pour enregistrer les fichiers atomes",
+        "options_converted_ok":  "Conversion réussie. {} fichier(s) traité(s).",
+        "options_link_broken":   "Fichier introuvable sur le disque :\n{}",
+        "options_no_change":     "Aucun changement de mode.",
+        "options_no_files":      "Aucun fichier atomes à convertir dans ce document.",
+        "options_confirm_switch":"Changer de mode va convertir tous les fichiers atomes\ndu document. Continuer ?",
+        "options_confirm_title": "Confirmer le changement de mode",
+        "yes":                   "Oui",
+        "no":                    "Non",
     },
     "en": {
         "insert_title":        "Insert an atomes project file",
@@ -45,10 +63,30 @@ STRINGS = {
         "image_update_failed": "Impossible to update atomes illustration",
         "ok":                  "OK",
         "cancel":              "Cancel",
+        # ── Strings added for the options dialog and persistent storage ──
+        "options_title":         "Options — atomes Extension",
+        "options_mode_label":    "Storage mode for atomes files:",
+        "options_external":      "External links (files on the hard drive)",
+        "options_external_desc": "The .apf files remain on disk.\nThe document only contains links.",
+        "options_internal":      "Internal storage (embedded in the document)",
+        "options_internal_desc": "The .apf files are embedded inside\nthe LibreOffice document.",
+        "options_apply":         "Apply",
+        "options_converting":    "Converting…",
+        "options_select_folder": "Select a folder to save atomes files",
+        "options_converted_ok":  "Conversion successful. {} file(s) processed.",
+        "options_link_broken":   "File not found on disk:\n{}",
+        "options_no_change":     "No mode change.",
+        "options_no_files":      "No atomes files to convert in this document.",
+        "options_confirm_switch":"Changing mode will convert all atomes files\nin this document. Continue?",
+        "options_confirm_title": "Confirm mode change",
+        "yes":                   "Yes",
+        "no":                    "No",
     },
 }
 
 def _detect_locale():
+    debug_log = open("/tmp/atomes_debug.log", "a")
+    debug_log.write("--- _detect_locale called ---\n")
     try:
         ctx  = uno.getComponentContext()
         prov = ctx.ServiceManager.createInstance(
@@ -57,12 +95,34 @@ def _detect_locale():
         arg.Name  = "nodepath"
         arg.Value = "/org.openoffice.Setup/L10N"
         acc = prov.createInstanceWithArguments(
-            "com.sun.star.configuration.ConfigurationAccessService", (arg,))
-        locale = acc.getByName("ooLocale") or ""
+            "com.sun.star.configuration.ConfigurationAccess", (arg,))
+        
+        locale = ""
+        try:
+            locale = acc.getByName("ooSetupUILocale")
+            debug_log.write("Fetched ooSetupUILocale: " + str(locale) + "\n")
+        except Exception as e:
+            debug_log.write("Error fetching ooSetupUILocale: " + str(e) + "\n")
+
+        if not locale:
+            try:
+                locale = acc.getByName("ooLocale")
+                debug_log.write("Fetched ooLocale: " + str(locale) + "\n")
+            except Exception as e:
+                debug_log.write("Error fetching ooLocale: " + str(e) + "\n")
+
+        locale = locale or ""
+        debug_log.write("Final locale string: '" + str(locale) + "'\n")
+        
         if locale.lower().startswith("fr"):
+            debug_log.write("Returning fr\n")
+            debug_log.close()
             return "fr"
-    except Exception:
-        pass
+    except Exception as e:
+        debug_log.write("Exception in _detect_locale: " + str(e) + "\n")
+    
+    debug_log.write("Returning en\n")
+    debug_log.close()
     return "en"
 
 _LOCALE = None

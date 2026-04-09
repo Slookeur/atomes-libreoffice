@@ -33,6 +33,23 @@
              <value>service:fr.ipcms.atomes.AtomesService?open</value>
             </prop>
           </node>
+          <!-- ── Séparateur ajouté pour le dialogue d'options ── -->
+          <node oor:name="Element-003" oor:op="replace">
+            <prop oor:name="URL" oor:type="xs:string">
+              <value>private:separator</value>
+            </prop>
+          </node>
+          <!-- ── Entrée de menu Options ajoutée ── -->
+          <node oor:name="Element-004" oor:op="replace">
+            <prop oor:name="Title" oor:type="xs:string">
+              <value xml:lang="fr">Options</value>
+              <value xml:lang="en">Options</value>
+              <value>Options</value>
+            </prop>
+            <prop oor:name="URL" oor:type="xs:string">
+              <value>service:fr.ipcms.atomes.AtomesService?options</value>
+            </prop>
+          </node>
         </node>
       </node>
     </node>
