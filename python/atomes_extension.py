@@ -7,7 +7,7 @@ de prévisualisation (ou l'icône atomes) est insérée.
 
 Interactions :
   • Menu atomes → Insérer / Ouvrir
-  • Clic droit → Ouvrir avec atomes (XContextMenuInterceptor)
+  • Clic droit → Ouvrir avec atomes (XContextMenuInterceptor) - Not working so far !
   • Double-Clic sur l'image insérée -> Ouvre le fichier stocké avec atomes (OnClick + XMouseClickHandler)
 """
 #
@@ -34,7 +34,6 @@ from com.sun.star.awt import XMouseClickHandler, XItemListener, Size
 from com.sun.star.embed import ElementModes
 from com.sun.star.beans import PropertyValue
 from com.sun.star.ui import XContextMenuInterceptor
-# ── Import ajouté pour l'écouteur d'événements de sauvegarde ──
 from com.sun.star.document import XDocumentEventListener
 from com.sun.star.ui.ContextMenuInterceptorAction import IGNORED, EXECUTE_MODIFIED
 
@@ -47,11 +46,8 @@ from atomes_i18n import _
 
 # ── Constants ──────────────────────────────────────────────────────────
 EXTENSION_ID       = "fr.ipcms.atomes.extension"
-ATOMES_STORAGE     = "ObjectReplacements"
 ATOMES_PREFIX      = "AtomesFile_"
 ATOMES_DESCRIPTION = "AtomesFile:"
-
-# ── Constantes ajoutées pour le stockage pérenne et le mode de stockage ──
 ATOMES_PERSISTENT_STORAGE = "AtomesFiles"      # Dossier ODF dédié (non géré par LO)
 ATOMES_EMBED_PREFIX       = "AtomesEmbed:"      # Préfixe Description : mode interne
 ATOMES_LINK_PREFIX        = "AtomesLink:"        # Préfixe Description : mode liens
@@ -62,7 +58,7 @@ ATOMES_MAP_PROP           = "AtomesFileMap"      # Propriété document : JSON {
 # Session-level references (prevent GC)
 _mouse_handlers   = {}
 _ctx_interceptors = {}
-# ── Caches session ajoutés pour le stockage pérenne (mode zip) ──
+# ── Caches session pour le stockage pérenne (mode zip) ──
 _atomes_file_cache = {}   # {doc_url: {stored_name: bytes_data}}
 _post_save_listeners = {} # {doc_url: AtomesPostSaveListener}
 
@@ -154,30 +150,6 @@ def _make_pv(name, value):
 def _event_props(macro_url):
     return (_make_pv("EventType", "Script"), _make_pv("Script", macro_url))
 
-def _list_storage(storage, prefix=""):
-    try:
-        names = storage.getElementNames()
-        for name in names:
-            full_path = f"{prefix}{name}"
-            # print(full_path)
-
-            try:
-                if storage.isStorageElement(name):
-                    print(f"[DIR ] {full_path}/")
-                    sub = storage.openStorageElement(name, ElementModes.READ)
-                    _list_storage(sub, full_path + "/")
-
-                elif storage.isStreamElement(name):
-                    print(f"[FILE] {full_path}")
-
-                else:
-                    print(f"[??? ] {full_path}")
-
-            except Exception:
-                pass
-    except Exception:
-        traceback.print_exc()
-
 
 def _inspect_uno(obj, name="objet"):
     print(f"\n=== Inspection de {name} ===")
@@ -235,124 +207,31 @@ def _get_selected_atomes_shape_from_description(doc, desc):
         pass
     return None
 
+
+def _get_all_atomes_shapes(doc):
+    """Retourne toutes les shapes atomes du document."""
+    shapes = []
+    try:
+        draw_page = _get_draw_page(doc)
+        if draw_page is None:
+            return shapes
+        for i in range(draw_page.getCount()):
+            shape = draw_page.getByIndex(i)
+            if hasattr(shape, "Name") and shape.Name and shape.Name.startswith(ATOMES_PREFIX):
+                shapes.append(shape)
+    except Exception:
+        pass
+    return shapes
+
+
+# display atomes subprocess information 
+def atomes_output (result):
+    print(f"result.returncode= {result.returncode}")
+    print(f"Sortie d'atomes : {result.stdout}")
+    print(f"Erreur d'atomes : {result.stderr}")
+
 # ══════════════════════════════════════════════════════════════════════
 # ODF storage
-# ══════════════════════════════════════════════════════════════════════
-
-def _embed_file(doc, filepath, stored_name, replace=False):
-    """
-    Écrit un fichier dans le stockage ODF.
-    
-    - replace=False → création si absent (embed)
-    - replace=True  → remplace uniquement si existant
-    """
-    try:     
-        root = doc.getDocumentStorage()
-        _list_storage(root)
-        mode = ElementModes.READWRITE
-
-        # Accès / création du sous-stockage
-        if not root.hasByName(ATOMES_STORAGE):
-            if replace:
-                print("Storage inexistant, impossible de remplacer.")
-                return False
-
-        atomes_storage = root.openStorageElement(ATOMES_STORAGE, mode)
-
-        # apf_file_name = f"{ATOMES_STORAGE}/{stored_name}"
-        exists = atomes_storage.hasByName(stored_name)
-        # Cas remplacement strict
-        if replace and not exists:
-            print(f"Fichier {stored_name} introuvable pour remplacement.")
-            return False
-
-        # Ouverture du stream
-        stream_mode = mode | ElementModes.TRUNCATE if exists else mode
-        stream = atomes_storage.openStreamElement(stored_name, stream_mode)
-        out = stream.getOutputStream()
-
-        with open(filepath, "rb") as fh:
-            data = fh.read()
-            out.writeBytes(uno.ByteSequence(data))
-
-        # Fermeture du stream et sauvegarde
-        out.closeOutput()
-        atomes_storage.commit()
-        root.commit()
-
-        action = "remplacé" if exists else "ajouté"
-        print(f"Fichier {stored_name} {action} avec succès.")
-        _list_storage(root)
-        return True
-
-    except Exception as e:
-        print(f"Erreur écriture fichier embarqué : {e}")
-        traceback.print_exc()
-        return False
-
-
-def _resolve_apf_from_shape(shape):
-    name = shape.Name or ""
-
-    if not name.startswith(ATOMES_PREFIX):
-        return None
-
-    obj_id = name.split("_", 1)[1]
-    return obj_id
-
-
-def _extract_atomes_file(doc, stored_name):
-    try:
-        root = doc.getDocumentStorage()
-        mode = ElementModes.READ
-        print("Got Storage")
-        print("Root after reload:", list(root.getElementNames()))
-        if not root.hasByName(ATOMES_STORAGE):
-            print("No ATOMES_STORAGE")
-            return None
-        print("Looking for storage:", ATOMES_STORAGE)
-        print("Root elements:", list(root.getElementNames()))
-        atomes_storage = root.openStorageElement(ATOMES_STORAGE, mode)
-        if not atomes_storage.hasByName(stored_name):
-            return None
-        stream  = atomes_storage.openStreamElement(stored_name, mode)
-        inp     = stream.getInputStream()
-        # apf_file_name = f"{ATOMES_STORAGE}/{stored_name}"
-        print("Looking for file:", stored_name)
-        print("Available files:", list(atomes_storage.getElementNames()))
-        chunks  = []
-        buf_ref = uno.ByteSequence(b"\x00" * 65536)
-        while True:
-            n, chunk = inp.readBytes(buf_ref, 65536)
-            if n == 0:
-                break
-            chunks.append(bytes(chunk))
-        inp.closeInput()
-        with tempfile.NamedTemporaryFile(suffix=".apf", delete=False) as tmp:
-            for c in chunks:
-                tmp.write(c)
-            return tmp.name
-    except Exception as e:
-        traceback.print_exc()
-        return None
-
-
-def _list_embedded_files(doc):
-    try:
-        root = doc.getDocumentStorage()
-        if not root.hasByName(ATOMES_STORAGE):
-            return []
-        atomes_storage = root.openStorageElement(ATOMES_STORAGE, ElementModes.READ)
-        return [n for n in atomes_storage.getElementNames() if n.endswith(".apf")]
-    except Exception:
-        return []
-
-
-# ══════════════════════════════════════════════════════════════════════
-# Stockage pérenne — Fonctions ajoutées
-# ══════════════════════════════════════════════════════════════════════
-
-# ══════════════════════════════════════════════════════════════════════
 # Stockage pérenne — Fonctions de routage (Propriétés vs ZIP)
 # ══════════════════════════════════════════════════════════════════════
 
@@ -392,7 +271,7 @@ def _remove_embedded_file_persistent(doc, stored_name):
         return _remove_file_zip(doc, stored_name)
 
 
-# ── IMPLÉMENTATION : PROPRIÉTÉS DOCUMENT (Recommandé, simple) ──
+# ── Mode : Propriétés du document (Recommandé, simple) ──
 
 def _embed_file_properties(doc, filepath, stored_name, replace=False):
     try:
@@ -413,6 +292,7 @@ def _embed_file_properties(doc, filepath, stored_name, replace=False):
         traceback.print_exc()
         return False
 
+
 def _extract_file_properties(doc, stored_name):
     try:
         udp = _get_user_props(doc)
@@ -430,12 +310,14 @@ def _extract_file_properties(doc, stored_name):
         traceback.print_exc()
         return None
 
+
 def _list_files_properties(doc):
     try:
         udp = _get_user_props(doc)
         return [p.Name[4:] for p in udp.getPropertySetInfo().getProperties() if p.Name.startswith("Apf_")]
     except Exception:
         return []
+
 
 def _remove_file_properties(doc, stored_name):
     try:
@@ -449,7 +331,7 @@ def _remove_file_properties(doc, stored_name):
         return False
 
 
-# ── IMPLÉMENTATION : ARCHIVE ZIP POST-SAVE (Fichiers lourds) ──
+# ── Mode : Archive ZIP post-sauvegarde (Fichiers lourds) ──
 
 def update_zip_reliable(path, new_files_dict):
     """Méthode robuste d'injection ZIP post sauvegarde."""
@@ -470,7 +352,7 @@ def update_zip_reliable(path, new_files_dict):
                 zout.writestr(fname, fcontent)
                 
             if manifest_data:
-                # Injection rapide des entrées manquantes dans le XML du manifest
+                # Injection des entrées manquantes dans le XML du manifest
                 for fname in new_files_dict.keys():
                     entry_tag = f'<manifest:file-entry manifest:full-path="{fname}" manifest:media-type="application/vnd.atomes.apf"/>'
                     if entry_tag not in manifest_data:
@@ -483,6 +365,7 @@ def update_zip_reliable(path, new_files_dict):
         if os.path.exists(tmp_path):
             try: os.unlink(tmp_path)
             except: pass
+
 
 class AtomesPostSaveListener(unohelper.Base, XDocumentEventListener):
     def __init__(self, doc):
@@ -503,6 +386,7 @@ class AtomesPostSaveListener(unohelper.Base, XDocumentEventListener):
                 print(f"[ZIP] Erreur listener : {e}")
     def disposing(self, source): pass
 
+
 def _register_post_save_listener(doc):
     try:
         key = doc.getURL()
@@ -511,6 +395,7 @@ def _register_post_save_listener(doc):
             doc.addDocumentEventListener(listener)
             _post_save_listeners[key] = listener
     except Exception: pass
+
 
 def _embed_file_zip(doc, filepath, stored_name, replace=False):
     """Mise en cache du fichier, sera injecté par le PostSaveListener ET écrit immédiatement en mémoire."""
@@ -538,6 +423,7 @@ def _embed_file_zip(doc, filepath, stored_name, replace=False):
     except Exception as e:
         print(f"[ZIP] Erreur embed cache : {e}")
         return False
+
 
 def _extract_file_zip(doc, stored_name):
     """Lecture du fichier depuis le Storage LO ou le cache."""
@@ -572,6 +458,7 @@ def _extract_file_zip(doc, stored_name):
         print(f"[ZIP] Erreur extract : {e}")
         return None
 
+
 def _list_files_zip(doc):
     try:
         root = doc.getDocumentStorage()
@@ -580,6 +467,7 @@ def _list_files_zip(doc):
         return [n for n in storage.getElementNames() if n.endswith(".apf")]
     except Exception:
         return []
+
 
 def _remove_file_zip(doc, stored_name):
     try:
@@ -598,9 +486,8 @@ def _remove_file_zip(doc, stored_name):
     except Exception:
         return False
 
-
 # ══════════════════════════════════════════════════════════════════════
-# Gestion du mode de stockage — Fonctions ajoutées
+# Gestion du mode de stockage 
 # ══════════════════════════════════════════════════════════════════════
 
 def _get_user_props(doc):
@@ -688,42 +575,18 @@ def _set_file_map(doc, mapping):
         print(f"Erreur _set_file_map : {e}")
         traceback.print_exc()
 
-
-def _get_all_atomes_shapes(doc):
-    """Retourne toutes les shapes atomes du document."""
-    shapes = []
-    try:
-        draw_page = _get_draw_page(doc)
-        if draw_page is None:
-            return shapes
-        for i in range(draw_page.getCount()):
-            shape = draw_page.getByIndex(i)
-            if hasattr(shape, "Name") and shape.Name and shape.Name.startswith(ATOMES_PREFIX):
-                shapes.append(shape)
-    except Exception:
-        pass
-    return shapes
-
-
-def atomes_output (result):
-    print(f"result.returncode= {result.returncode}")
-    print(f"Sortie d'atomes : {result.stdout}")
-    print(f"Erreur d'atomes : {result.stderr}")
-
-
-# ══════════════════════════════════════════════════════════════════════
-# Dialogue d'options & conversion de mode — Fonctions ajoutées
+ ══════════════════════════════════════════════════════════════════════
+# Dialogue d'options & conversion de mode
 # ══════════════════════════════════════════════════════════════════════
 
 from atomes_options import show_options_dialog
 
 # ══════════════════════════════════════════════════════════════════════
-# Ouverture dispatch selon le mode — Fonction ajoutée
+# Ouverture dispatch selon le mode
 # ══════════════════════════════════════════════════════════════════════
 
 def _open_atomes_file_dispatch(doc, shape):
-    """Ouvre un fichier atomes selon le mode de stockage (interne ou lien).
-    Remplace _open_embedded_file pour le mode pérenne."""
+    """Ouvre un fichier atomes selon le mode de stockage (interne ou lien)."""
     desc = shape.Description or ""
     mode = _get_storage_mode(doc)
 
@@ -748,7 +611,7 @@ def _open_atomes_file_dispatch(doc, shape):
             output_image = f"/tmp/atomes_update_{uid}.png"
             print(f" EXTERN:: open file with atomes: file_path= {file_path}, output_image= {output_image}")
             result = subprocess.run(["atomes", "--libreoffice", "-o", output_image, file_path], capture_output=True, text=True)
-            atomes_output(result)
+            # atomes_output(result)
             if result.returncode == 0 and os.path.exists(output_image):
                 shape.GraphicURL = uno.systemPathToFileUrl(output_image)
                 if Image is not None:
@@ -778,7 +641,7 @@ def _open_atomes_file_dispatch(doc, shape):
         output_image = f"/tmp/atomes_update_{uid}.png"
         print(f" INTERN:: open file with atomes: tmp= {tmp}, output_image= {output_image}")
         result = subprocess.run(["atomes", "--libreoffice", "-o", output_image, tmp], capture_output=True, text=True)
-        atomes_output(result)
+        # atomes_output(result)
         if result.returncode == 0:
             if os.path.exists(output_image):
                 shape.GraphicURL = uno.systemPathToFileUrl(output_image)
@@ -837,7 +700,6 @@ class AtomesContextMenuInterceptor(unohelper.Base, XContextMenuInterceptor):
             trigger.Text = _("context_menu_open")
             trigger.CommandURL = ("vnd.sun.star.script:atomes_extension.py$open_from_context_menu?language=Python&location=share")
             menu.insertByIndex(0, trigger)
-            print("Élément ajouté au menu contextuel.")
             return EXECUTE_MODIFIED
         except Exception:
             return IGNORED
@@ -877,48 +739,6 @@ def _register_handlers(doc):
        traceback.print_exc()
 
 # ══════════════════════════════════════════════════════════════════════
-# Core: open an embedded file
-# ══════════════════════════════════════════════════════════════════════
-
-def _open_embedded_file(doc, stored_name, shape):
-    if not stored_name:
-        _show_message(doc, _("invalid_file_name"), _("error_title"), error=True)
-        return
-    tmp = _extract_atomes_file(doc, stored_name)
-    if tmp is None:
-        _show_message(doc, f"{_('file_not_found')}:\n{stored_name}", _("error_title"), error=True)
-        return
-    try:
-        # Génère un ID unique pour l'objet
-        uid = shape.Name.split("_")[-1] if shape else "unknown"
-        output_image = f"/tmp/atomes_update_{uid}.png"
-        result = subprocess.run(["atomes", "--libreoffice", "-o", output_image, tmp], capture_output=True, text=True)
-        atomes_output(result)
-        if result.returncode == 0: 
-            if os.path.exists(output_image):
-                # Met à jour l'objet graphique avec la nouvelle image
-                shape.GraphicURL = uno.systemPathToFileUrl(output_image)
-                with Image.open(output_image) as img:
-                    width, height = img.size
-                width_twips = int(width * 1440 / 96 )  # Approximation moyenne
-                height_twips = int(height * 1440 / 96)
-                shape.Size = Size(width_twips, height_twips)
-                # Nettoie le fichier temporaire
-                if os.path.exists(output_image):
-                    os.unlink(output_image)
-                try: doc.setModified(True)
-                except Exception: pass
-            else:
-                _show_message(doc, _("image_update_failed"), _("error_title"), error=False)
-            # Update apf content in LibreOffice document
-            if not _embed_file(doc, tmp, stored_name, replace=True):
-                _show_message(doc, _("embed_failed"), _("error_title"), error=True)
-        else:
-            _show_message(doc, _("update_failed"), _("error_title"), error=True)
-    except Exception as e:
-        _show_message(doc, f"{_('open_atomes_failed')}\n{e}", _("error_title"), error=True)
-
-# ══════════════════════════════════════════════════════════════════════
 # Selection dialog (multiple embedded files)
 # ══════════════════════════════════════════════════════════════════════
 
@@ -948,18 +768,6 @@ def _selection_dialog(files, doc):
         pass
     return files[0] if files else None
 
-
-def find_all_ole_objects(doc):
-    """Trouve tous les objets OLE présents dans le document."""
-    text = doc.getText()
-    text_enum = text.createEnumeration()
-    ole_objects = []
-    while text_enum.hasMoreElements():
-        element = text_enum.nextElement()
-        if element.supportsService("com.sun.star.text.TextEmbeddedObject"):
-            ole_objects.append(element)
-    return ole_objects
-
 # ══════════════════════════════════════════════════════════════════════
 # Exported macros
 # ══════════════════════════════════════════════════════════════════════
@@ -970,7 +778,6 @@ def insert_atomes_file(*args):
     if doc is None:
         return None
 
-    
     # File picker
     fp = _lo_ctx().ServiceManager.createInstance("com.sun.star.ui.dialogs.FilePicker")
     fp.setTitle(_("insert_title"))
@@ -993,7 +800,7 @@ def insert_atomes_file(*args):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False, prefix="atomes_") as tmp:
             png_path = tmp.name
         result = subprocess.run(["atomes", "--render-png", apf_path, "-o", png_path], timeout=120, capture_output=True)
-        atomes_output(result)
+        # atomes_output(result)
         if result.returncode == 0 and os.path.exists(png_path) and os.path.getsize(png_path) > 0:
             image_ok = True
     except Exception:
@@ -1024,7 +831,7 @@ def insert_atomes_file(*args):
         uid               = uuid.uuid4().hex[:12]
         unique_name       = f"{uuid.uuid4().hex[:8]}_{apf_basename}"
         shape.Name        = f"{ATOMES_PREFIX}{unique_name}"
-        # ── Description adaptée au mode de stockage (ajouté) ──
+        # ── Description adaptée au mode de stockage ──
         storage_mode = _get_storage_mode(doc)
         if storage_mode == "external":
             # Mode liens : stocker le chemin absolu du fichier
@@ -1044,18 +851,13 @@ def insert_atomes_file(*args):
         traceback.print_exc()
         return None
 
-    # ── Stockage du fichier .apf dans le document (ajouté) ──
-    # ── Approche 1 : stockage non-pérenne (ObjectReplacements, original) ──
-    # if not _embed_file(doc, apf_path, unique_name, replace=False):
-    #     _show_message(doc, _("embed_failed"), _("error_title"), error=True)
-
-    # ── Approche 2 : stockage pérenne (AtomesFiles + cache + save listener) ──
+    # ── Stockage du fichier .apf dans le document ──
     storage_mode = _get_storage_mode(doc)
     if storage_mode == "internal":
         if not _embed_file_persistent(doc, apf_path, unique_name, replace=False):
             _show_message(doc, _("embed_failed"), _("error_title"), error=True)
 
-    # ── Enregistrement du chemin original dans la file map (ajouté) ──
+    # ── Enregistrement du chemin original dans la file map ──
     file_map = _get_file_map(doc)
     file_map[unique_name] = apf_path
     _set_file_map(doc, file_map)
@@ -1068,15 +870,6 @@ def insert_atomes_file(*args):
         try: os.unlink(png_path)
         except Exception: pass
 
-    #ole_objects = find_all_ole_objects(doc)
-    #if ole_objects:
-    #    print(f"✅ Trouvé {len(ole_objects)} objet(s) OLE dans le document.")
-    #    for i, obj in enumerate(ole_objects):
-    #        print(f"  Objet {i+1} :")
-    #        print(f"    - Nom : {obj.getPropertyValue('Name')}")
-    #        print(f"    - Lien : {obj.getPropertyValue('URL')}")
-    #else:
-    #    print("❌ Aucun objet OLE trouvé dans le document.")
     return None
 
 
@@ -1085,7 +878,7 @@ def open_atomes_file(*args):
     doc = _get_document()
     if doc is None:
         return None
-    # ── Utilisation du stockage pérenne (modifié) ──
+    # ── Utilisation du stockage pérenne ──
     mode = _get_storage_mode(doc)
     if mode == "internal":
         embedded = _list_embedded_files_persistent(doc)
@@ -1107,7 +900,7 @@ def open_atomes_file(*args):
     if not shape:
         print("Cannot associate selection to shape")
         return None
-    # ── Dispatch selon le mode (modifié) ──
+    # ── Dispatch selon le mode  ──
     _open_atomes_file_dispatch(doc, shape)
     return None
 
@@ -1140,7 +933,6 @@ def open_from_context_menu(*args):
     return on_atomes_click(*args)
 
 
-# ── show_options_dialog ajouté à la liste des macros exportées ──
 g_exportedScripts = (
     insert_atomes_file,
     open_atomes_file,

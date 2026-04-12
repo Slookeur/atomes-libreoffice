@@ -153,24 +153,28 @@ def show_advanced_dialog(doc):
     ctx = _lo_ctx()
     smgr = ctx.ServiceManager
     current = _get_internal_mode(doc)
-    dm = _create_dialog_model(smgr, 190, 130, "Stockage Interne Avancé")
+    dm = _create_dialog_model(smgr, 190, 142, "advanced_embedded")
 
-    rb_props = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_props", 10, 10, 170, 14, "Propriétés du Document (Recommandé)")
+     # Label titre
+    lbl = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_title", 12, 10, 130, 14, "advanced_label")
+    lbl.FontWeight = 150  # gras
+
+    rb_props = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_props", 10, 30, 170, 14, "document_properties")
     rb_props.State = 1 if current == "properties" else 0
 
-    lbl_p = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_p", 20, 25, 160, 24, "Sécurisé et natif. Recommandé pour des fichiers très légers (moins de quelques Mo).")
+    lbl_p = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_p", 20, 44, 160, 24, "small_files")
     lbl_p.MultiLine = True
 
-    rb_zip = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_zip", 10, 55, 170, 14, "Archive ODF (ZIP) post-sauvegarde")
+    rb_zip = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_zip", 10, 69, 170, 14, "odf_archive")
     rb_zip.State = 1 if current == "zip" else 0
 
-    lbl_z = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_z", 20, 70, 160, 24, "Idéal pour les fichiers massifs. Hack de l'archive ZIP après la sauvegarde.")
+    lbl_z = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_z", 20, 83, 160, 24, "large_files")
     lbl_z.MultiLine = True
 
-    btn_cancel = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_cancel", 30, 105, 50, 18, "cancel")
+    btn_cancel = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_cancel", 30, 120, 50, 18, "cancel")
     btn_cancel.PushButtonType = 2
 
-    btn_ok = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_ok", 110, 105, 50, 18, "options_apply")
+    btn_ok = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_ok", 110, 120, 50, 18, "options_apply")
     btn_ok.PushButtonType = 1
 
     dlg = _create_dialog(smgr, dm)
@@ -244,7 +248,7 @@ def show_options_dialog(*args):
     lbl_int.MultiLine = True
 
     # Bouton Avancé
-    btn_adv = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_advanced", 16, 115, 60, 18, "Avancé...")
+    btn_adv = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_advanced", 60, 110, 60, 18, "Avancé...")
     btn_adv.Enabled = True
 
     # Bouton Annuler
@@ -252,7 +256,7 @@ def show_options_dialog(*args):
     btn_cancel.PushButtonType = 2  # CANCEL
 
     # Bouton Appliquer
-    btn_apply = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_apply", 105, 138, 64, 18, "options_apply")
+    btn_apply = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_apply", 100, 138, 64, 18, "options_apply")
     btn_apply.PushButtonType = 1  # OK
 
     # ── Affichage du dialogue ──
