@@ -9,6 +9,8 @@ Interactions :
   • Menu atomes → Insérer / Ouvrir
   • Clic droit → Ouvrir avec atomes (XContextMenuInterceptor) - Not working so far !
   • Double-Clic sur l'image insérée -> Ouvre le fichier stocké avec atomes (OnClick + XMouseClickHandler)
+
+LLM tools (Claude, Gemini, GPT, Lechat) were used at different stages to prepare this file
 """
 #
 # The following helps to traceback error, at any point, 
@@ -575,7 +577,7 @@ def _set_file_map(doc, mapping):
         print(f"Erreur _set_file_map : {e}")
         traceback.print_exc()
 
- ══════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # Dialogue d'options & conversion de mode
 # ══════════════════════════════════════════════════════════════════════
 

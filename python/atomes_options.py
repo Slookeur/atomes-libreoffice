@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+LLM tools (Claude, Gemini, GPT, Lechat) were used at different stages to prepare this file
+"""
 import os
 import shutil
 import uno
