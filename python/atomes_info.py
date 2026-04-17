@@ -34,6 +34,8 @@ tout risque de dépendance cyclique lors du chargement par LibreOffice.
 
 import re
 import os
+import sys
+import shutil
 import tempfile
 
 # ══════════════════════════════════════════════════════════════════════
@@ -48,6 +50,7 @@ import tempfile
 # à la manière des packages Java/Android.
 
 # Identifiant principal pour la création des variables de ce fichier
+# et nom de la commande pour lancer l'application sous Linux
 atomes = "atomes"
 
 # Identifiant principal de l'extension (correspond à <identifier> dans description.xml
@@ -76,8 +79,29 @@ atomes_MENU_NODE_ID = "fr.ipcms.atomes.extension.menu"
 # Pour adapter l'extension à un autre logiciel, remplacer l'exécutable et
 # adapter les options de ligne de commande correspondantes.
 
-# Nom de l'exécutable tel qu'il doit être accessible dans le PATH système
-atomes_EXECUTABLE = atomes + ".exe" if os.name == 'nt' else atomes
+# Nom de l'exécutable tel qu'accessible dans le PATH
+if sys.platform == 'win32':
+    atomes_EXECUTABLE = atomes + ".exe"
+elif sys.platform == 'darwin':
+    # Cherche d'abord dans le PATH (si LibreOffice a été lancé depuis un terminal)
+    if shutil.which(atomes):
+        atomes_EXECUTABLE = atomes
+    else:
+        # Sinon, cherche dans les dossiers d'installation typiques de macOS
+        mac_paths = [
+            "/Applications/atomes.app/Contents/MacOS/atomes",
+            "/Applications/Atomes.app/Contents/MacOS/atomes",
+            "/opt/homebrew/bin/atomes",
+            "/usr/local/bin/atomes"
+        ]
+        atomes_EXECUTABLE = atomes # Valeur par défaut si non trouvé
+        for p in mac_paths:
+            if os.path.exists(p):
+                atomes_EXECUTABLE = p
+                break
+else:
+    # Linux / autres (os.name == 'posix')
+    atomes_EXECUTABLE = atomes
 
 # Option pour afficher la version du logiciel (utilisée dans _check_atomes_version)
 # La sortie attendue doit contenir le pattern défini par atomes_VERSION_PATTERN ci-dessous
