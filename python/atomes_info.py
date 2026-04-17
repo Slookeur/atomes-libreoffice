@@ -132,7 +132,7 @@ atomes_VERSION_PATTERN = re.compile(
 atomes_apf = "apf"
 
 # Extension de fichier native du logiciel (avec le point)
-atomes_FILE_EXTENSION = "." + apf
+atomes_FILE_EXTENSION = "." + atomes_apf
 
 # Glob pour le filtre de fichiers dans les boîtes de dialogue FilePicker
 atomes_FILE_FILTER = "*" + atomes_FILE_EXTENSION
@@ -190,7 +190,7 @@ atomes_ODF_STORAGE_FOLDER = atomes + "Files"
 
 # Préfixe des propriétés UserDefined du document (mode stockage par propriétés)
 # Exemple : propriété "apf_a1b2c3d4_monprojet.apf" contient le contenu Base64
-atomes_PROP_FILE_PREFIX = apf + "_"
+atomes_PROP_FILE_PREFIX = atomes_apf + "_"
 
 # Nom de la propriété UserDefined stockant le mode de stockage global
 # Valeurs possibles : "internal" (défaut) ou "external"
