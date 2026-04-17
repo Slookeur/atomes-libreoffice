@@ -33,6 +33,8 @@ tout risque de dépendance cyclique lors du chargement par LibreOffice.
 """
 
 import re
+import os
+import tempfile
 
 # ══════════════════════════════════════════════════════════════════════
 # 1. IDENTIFIANTS DE L'EXTENSION
@@ -75,7 +77,7 @@ atomes_MENU_NODE_ID = "fr.ipcms.atomes.extension.menu"
 # adapter les options de ligne de commande correspondantes.
 
 # Nom de l'exécutable tel qu'il doit être accessible dans le PATH système
-atomes_EXECUTABLE = atomes
+atomes_EXECUTABLE = atomes + ".exe" if os.name == 'nt' else atomes
 
 # Option pour afficher la version du logiciel (utilisée dans _check_atomes_version)
 # La sortie attendue doit contenir le pattern défini par atomes_VERSION_PATTERN ci-dessous
@@ -148,8 +150,10 @@ atomes_ICON_FILENAME = atomes + ".svg"
 atomes_TEMP_PNG_PREFIX = atomes + "_"
 atomes_TEMP_PNG_SUFFIX = ".png"
 
+# Répertoire temporaire du système
+atomes_TEMP_DIR = tempfile.gettempdir()
+
 # Préfixe des fichiers PNG temporaires utilisés lors de la mise à jour d'une shape
-# (utilisé dans /tmp lors du double-clic : /tmp/atomes_update_<uid>.png)
 atomes_TEMP_UPDATE_PREFIX = atomes + "_update_"
 
 

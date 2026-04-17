@@ -76,6 +76,7 @@ from atomes_info import (
     atomes_TEMP_PNG_PREFIX,
     atomes_TEMP_PNG_SUFFIX,
     atomes_TEMP_UPDATE_PREFIX,
+    atomes_TEMP_DIR,
     atomes_DEFAULT_SHAPE_WIDTH,
     atomes_DEFAULT_SHAPE_HEIGHT,
     atomes_PX_TO_LO_SCALE
@@ -675,7 +676,7 @@ def _extension_open_file_dispatch(doc, shape):
             return
         try:
             uid = shape.Name.split("_")[-1] if shape else "unknown"
-            output_image = f"/tmp/{atomes_TEMP_UPDATE_PREFIX}{uid}{atomes_TEMP_PNG_SUFFIX}"
+            output_image = os.path.join(atomes_TEMP_DIR, f"{atomes_TEMP_UPDATE_PREFIX}{uid}{atomes_TEMP_PNG_SUFFIX}")
             print(f" EXTERN:: open file with atomes: file_path= {file_path}, output_image= {output_image}")
             result = subprocess.run(
                 [atomes_EXECUTABLE, atomes_OPT_LIBREOFFICE, atomes_OPT_OUTPUT, output_image, file_path],
@@ -708,7 +709,7 @@ def _extension_open_file_dispatch(doc, shape):
         return
     try:
         uid = shape.Name.split("_")[-1] if shape else "unknown"
-        output_image = f"/tmp/{atomes_TEMP_UPDATE_PREFIX}{uid}{atomes_TEMP_PNG_SUFFIX}"
+        output_image = os.path.join(atomes_TEMP_DIR, f"{atomes_TEMP_UPDATE_PREFIX}{uid}{atomes_TEMP_PNG_SUFFIX}")
         print(f" INTERN:: open file with atomes: tmp= {tmp}, output_image= {output_image}")
         result = subprocess.run(
             [atomes_EXECUTABLE, atomes_OPT_LIBREOFFICE, atomes_OPT_OUTPUT, output_image, tmp],

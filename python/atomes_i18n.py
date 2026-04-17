@@ -7,6 +7,8 @@ LLM tools (Claude, Gemini, GPT, Lechat) were used at different occasions to prep
 """Internationalisation (FR / EN) — Extension atomes pour LibreOffice."""
 
 import uno
+import os
+import tempfile
 
 STRINGS = {
     "fr": {
@@ -110,7 +112,7 @@ STRINGS = {
 }
 
 def _detect_locale():
-    debug_log = open("/tmp/atomes_debug.log", "a")
+    debug_log = open(os.path.join(tempfile.gettempdir(), "atomes_debug.log"), "a")
     debug_log.write("--- _detect_locale called ---\n")
     try:
         ctx  = uno.getComponentContext()
