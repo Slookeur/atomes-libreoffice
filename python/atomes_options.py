@@ -9,16 +9,18 @@ import unohelper
 from com.sun.star.awt import XItemListener
 
 from atomes_i18n import _
+from atomes_info import (atomes_LINK_PREFIX, atomes_EMBED_PREFIX)
 
-# Importer les éléments nécessaires depuis le script principal
+# Importer les fonctions nécessaires depuis le script principal
 from atomes_extension import (
     _lo_ctx, _get_document, _show_message, _get_all_atomes_shapes,
     _get_file_map, _set_file_map, _get_storage_mode, _set_storage_mode,
     _get_internal_mode, _set_internal_mode,
     _extract_atomes_file_persistent, _remove_embedded_file_persistent,
-    _embed_file_persistent, ATOMES_LINK_PREFIX, ATOMES_EMBED_PREFIX,
+    _embed_file_persistent,
     _create_dialog_object, _create_dialog_model, _create_dialog
 )
+
 
 
 def _confirm_dialog(doc, msg, title):
@@ -75,7 +77,7 @@ def _convert_to_links(doc):
         shutil.copy2(tmp, dest_path)
         os.unlink(tmp)
         # Mettre à jour la shape : Description → lien
-        shape.Description = f"{ATOMES_LINK_PREFIX}{dest_path}"
+        shape.Description = f"{atomes_LINK_PREFIX}{dest_path}"
         file_map[unique_name] = dest_path
         # Supprimer du stockage interne
         _remove_embedded_file_persistent(doc, unique_name)
@@ -103,8 +105,8 @@ def _convert_to_internal(doc):
             continue
         # Trouver le chemin du fichier
         desc = shape.Description or ""
-        if desc.startswith(ATOMES_LINK_PREFIX):
-            file_path = desc[len(ATOMES_LINK_PREFIX):]
+        if desc.startswith(atomes_LINK_PREFIX):
+            file_path = desc[len(atomes_LINK_PREFIX):]
         elif unique_name in file_map:
             file_path = file_map[unique_name]
         else:
@@ -115,7 +117,7 @@ def _convert_to_internal(doc):
             continue
         # Embarquer le fichier
         if _embed_file_persistent(doc, file_path, unique_name, replace=False):
-            shape.Description = f"{ATOMES_EMBED_PREFIX}{unique_name}"
+            shape.Description = f"{atomes_EMBED_PREFIX}{unique_name}"
             count += 1
 
     if count > 0:
@@ -218,7 +220,7 @@ def _convert_internal_data(doc, new_mode):
         _show_message(doc, f"Migration interne terminée avec {count} fichiers.", "Succès")
 
 
-def show_options_dialog(*args):
+def show_options(*args):
     """Menu: atomes → Options. Dialogue de choix du mode de stockage."""
     doc = _get_document()
     if doc is None:

@@ -20,7 +20,7 @@
               <value>Insert a file</value>
             </prop>
             <prop oor:name="URL" oor:type="xs:string">
-              <value>service:fr.ipcms.atomes.AtomesService?insert</value>
+              <value>service:fr.ipcms.atomes.atomesService?insert</value>
             </prop>
           </node>
           <node oor:name="Element-002" oor:op="replace">
@@ -30,7 +30,7 @@
               <value>Open a file</value>
             </prop>
             <prop oor:name="URL" oor:type="xs:string">
-             <value>service:fr.ipcms.atomes.AtomesService?open</value>
+             <value>service:fr.ipcms.atomes.atomesService?open</value>
             </prop>
           </node>
           <!-- ── Séparateur ajouté pour le dialogue d'options ── -->
@@ -47,7 +47,7 @@
               <value>Options</value>
             </prop>
             <prop oor:name="URL" oor:type="xs:string">
-              <value>service:fr.ipcms.atomes.AtomesService?options</value>
+              <value>service:fr.ipcms.atomes.atomesService?options</value>
             </prop>
           </node>
         </node>

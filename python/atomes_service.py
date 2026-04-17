@@ -1,17 +1,30 @@
+# -*- coding: utf-8 -*-
+
+"""
+LLM tools (Claude, Gemini, GPT, Lechat) were used at different occasions to prepare this file
+"""
+
 import unohelper
-from com.sun.star.task import XJobExecutor
 from com.sun.star.task import XJobExecutor, XJob
 import sys
 import os
 
-# ajoute le dossier courant au sys.path
+# Ajoute le dossier courant au sys.path pour permettre les imports locaux
 ext_path = os.path.dirname(__file__)
 if ext_path not in sys.path:
     sys.path.append(ext_path)
 
+# Identifiants UNO centralisés — à modifier dans atomes_info.py pour adapter
+# l'extension à un autre logiciel (doit correspondre à Jobs.xcu et Addons.xcu)
+from atomes_info import (
+    atomes_JOB_ID,      # "fr.ipcms.atomes.atomesJob"    — référencé dans Jobs.xcu
+    atomes_SERVICE_ID,  # "fr.ipcms.atomes.atomesService" — référencé dans Addons.xcu
+)
+
 import atomes_extension
 
-class AtomesJob(unohelper.Base, XJob):
+
+class atomesJob(unohelper.Base, XJob):
     """Job appelé automatiquement par LibreOffice lors de l'ouverture d'un document (OnLoad)."""
     def __init__(self, ctx):
         self.ctx = ctx
@@ -23,48 +36,50 @@ class AtomesJob(unohelper.Base, XJob):
             if arg.Name == "Model":
                 doc = arg.Value
                 break
-        
+
         # If no explicit Model passed, try to get the active one
         if doc is None:
             doc = atomes_extension._get_document()
-            
+
         if doc is not None and hasattr(doc, "supportsService"):
             try:
                 # Check if document has atomes shapes
                 shapes = atomes_extension._get_all_atomes_shapes(doc)
                 if shapes:
-                    print("[AtomesJob] Document contient des objets Atomes. Réactivation des intercepteurs.")
+                    print("[atomesJob] Le document contient des objets atomes. Réactivation des intercepteurs.")
                     atomes_extension._register_handlers(doc)
                     atomes_extension._register_save_listener(doc)
             except Exception as e:
-                print(f"[AtomesJob] Erreur : {e}")
+                print(f"[atomesJob] Erreur : {e}")
         return ()
 
-class AtomesService(unohelper.Base, XJobExecutor):
+
+class atomesService(unohelper.Base, XJobExecutor):
     def __init__(self, ctx):
         self.ctx = ctx
 
     def trigger(self, args):
-        """Function calls from Addons.xcu"""
+        """Déclencheur des commandes du menu (Addons.xcu → service:…?<args>)."""
         if args == "insert":
-            atomes_extension.insert_atomes_file()
+            atomes_extension.insert_file()
         elif args == "open":
-            atomes_extension.open_atomes_file()
-        # ── Ajout du déclencheur pour le dialogue d'options ──
+            atomes_extension.open_file()
         elif args == "options":
-            atomes_extension.show_options_dialog()
+            atomes_extension.show_options()
         else:
             print(f"Commande inconnue : {args}")
 
+
 g_ImplementationHelper = unohelper.ImplementationHelper()
 g_ImplementationHelper.addImplementation(
-    AtomesJob,
-    "fr.ipcms.atomes.AtomesJob",
+    atomesJob,
+    atomes_JOB_ID,                    # "fr.ipcms.atomes.atomesJob"
     ("com.sun.star.task.Job",)
 )
 
 g_ImplementationHelper.addImplementation(
-    AtomesService,
-    "fr.ipcms.atomes.AtomesService",
+    atomesService,
+    atomes_SERVICE_ID,                # "fr.ipcms.atomes.atomesService"
     ("com.sun.star.task.Job",)
 )
+

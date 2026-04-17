@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+
 """
-LLM tools (Claude, Gemini, GPT, Lechat) were used at different stages to prepare this file
+LLM tools (Claude, Gemini, GPT, Lechat) were used at different occasions to prepare this file
 """
+
 """Internationalisation (FR / EN) — Extension atomes pour LibreOffice."""
 
 import uno
@@ -52,6 +54,9 @@ STRINGS = {
         "small_files":           "Petits fichiers '*.apf' (moins de quelques Mo)",
         "odf_archive":           "Archive ODF (ZIP) post-sauvegarde *",
         "large_files":           "Fichiers '*.apf' plus volumineux,\nhack de l'archive ODF après la sauvegarde.\n* Potentiel conflit d'accès concurrent sous Windows",
+        # Version check
+        "atomes_not_found":      "L'exécutable 'atomes' est introuvable ou ne peut pas être lancé.\nVeuillez installer atomes (≥ 1.3.0) avant d'utiliser cette extension.",
+        "atomes_version_too_old": "La version d'atomes installée ({}) est trop ancienne.\nLa version minimale requise est la 1.3.0.\nVeuillez mettre à jour atomes avant d'utiliser cette extension.",
           },
     "en": {
         "insert_title":        "Insert an atomes project file",
@@ -98,6 +103,9 @@ STRINGS = {
         "small_files":           "For small '*.apf' files (less than few Mo)",
         "odf_archive":           "Post-storage ODF archive (ZIP)*",
         "large_files":           "For large '*.apf' files, hack of the ODF archive after storage.\n*Potential concurrency conflict on Windows",
+        # Version check
+        "atomes_not_found":       "The 'atomes' executable cannot be found or launched.\nPlease install atomes (≥ 1.3.0) before using this extension.",
+        "atomes_version_too_old": "The installed version of atomes ({}) is too old.\nThe minimum required version is 1.3.0.\nPlease update atomes before using this extension.",
          },
 }
 
