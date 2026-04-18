@@ -36,7 +36,7 @@ import zlib
 import base64
 import zipfile
 import shutil
-from com.sun.star.awt import XMouseClickHandler, XItemListener, Size
+from com.sun.star.awt import XMouseClickHandler, XKeyHandler, XItemListener, Size
 from com.sun.star.embed import ElementModes
 from com.sun.star.beans import PropertyValue
 from com.sun.star.ui import XContextMenuInterceptor
@@ -85,6 +85,7 @@ from atomes_info import (
 
 # Session-level references (prevent GC)
 _mouse_handlers   = {}
+_key_handlers     = {}
 _ctx_interceptors = {}
 _dispatch_interceptors = {}
 # ── Caches session pour le stockage pérenne (mode zip) ──
@@ -251,6 +252,57 @@ def _get_all_atomes_shapes(doc):
     except Exception:
         pass
     return shapes
+
+
+def _get_atomes_shapes_about_to_be_deleted(doc, is_backspace, is_delete):
+    shapes_to_delete = []
+    try:
+        sel = doc.getCurrentController().getSelection()
+        if not sel:
+            return []
+            
+        # 1. GraphicObjectShape selection
+        if hasattr(sel, "Name") and sel.Name.startswith(atomes_SHAPE_NAME_PREFIX):
+            return [sel]
+        if hasattr(sel, "Count"):
+            for i in range(sel.Count):
+                s = sel.getByIndex(i)
+                if hasattr(s, "Name") and s.Name.startswith(atomes_SHAPE_NAME_PREFIX):
+                    shapes_to_delete.append(s)
+                    
+        if shapes_to_delete:
+            return shapes_to_delete
+            
+        # 2. Text selection containing a shape
+        if hasattr(sel, "supportsService") and sel.supportsService("com.sun.star.text.TextRanges"):
+            all_shapes = _get_all_atomes_shapes(doc)
+            if not all_shapes:
+                return []
+                
+            for i in range(sel.Count):
+                text_range = sel.getByIndex(i)
+                text = text_range.getText()
+                cursor = text.createTextCursorByRange(text_range)
+                
+                if cursor.isCollapsed():
+                    if is_backspace:
+                        cursor.goLeft(1, True)
+                    elif is_delete:
+                        cursor.goRight(1, True)
+                        
+                for s in all_shapes:
+                    if hasattr(s, "Anchor") and s.Anchor:
+                        anchor = s.Anchor
+                        try:
+                            if anchor.getText() == text:
+                                if text.compareRegionStarts(cursor, anchor) >= 0 and text.compareRegionEnds(cursor, anchor) <= 0:
+                                    if s not in shapes_to_delete:
+                                        shapes_to_delete.append(s)
+                        except Exception:
+                            pass
+    except Exception:
+        pass
+    return shapes_to_delete
 
 
 # display atomes subprocess information 
@@ -758,6 +810,48 @@ class atomes_MouseHandler(unohelper.Base, XMouseClickHandler):
         return False
 
 
+class atomes_KeyHandler(unohelper.Base, XKeyHandler):
+    """Intercepts DELETE and BACKSPACE keys to monitor shape deletion."""
+    def __init__(self, doc):
+        self.doc = doc
+
+    def keyPressed(self, event):
+        # 1283 = BACKSPACE, 1286 = DELETE
+        if event.KeyCode in (1283, 1286):
+            try:
+                is_backspace = (event.KeyCode == 1283)
+                is_delete = (event.KeyCode == 1286)
+                shapes = _get_atomes_shapes_about_to_be_deleted(self.doc, is_backspace, is_delete)
+                
+                for shape in shapes:
+                    unique_name = shape.Name.split("_", 1)[1] if "_" in shape.Name else None
+                    desc = shape.Description or ""
+                    is_link = desc.startswith(atomes_LINK_PREFIX)
+                    mode = _get_storage_mode(self.doc)
+                    
+                    if not is_link and mode != "external":
+                        toolkit = _lo_ctx().ServiceManager.createInstance("com.sun.star.awt.Toolkit")
+                        frame = self.doc.getCurrentController().getFrame()
+                        peer = frame.getContainerWindow() if frame else None
+                        from com.sun.star.awt.MessageBoxType import QUERYBOX
+                        from com.sun.star.awt.MessageBoxButtons import BUTTONS_YES_NO
+                        box = toolkit.createMessageBox(peer, QUERYBOX, BUTTONS_YES_NO, _("confirm_delete_title"), _("confirm_delete_msg"))
+                        res = box.execute()
+                        box.dispose()
+                        if res != 2: # 2 = YES
+                            return True # Consume event to prevent shape deletion
+                        
+                        if unique_name:
+                            _remove_embedded_file_persistent(self.doc, unique_name)
+            except Exception as e:
+                print(f"Erreur atomes_KeyHandler: {e}")
+                traceback.print_exc()
+        return False
+
+    def keyReleased(self, event):
+        return False
+
+
 class atomes_ContextMenuInterceptor(unohelper.Base, XContextMenuInterceptor):
     """Adds 'Open with atomes' to the context menu for atomes shapes."""
     def __init__(self, doc):
@@ -898,6 +992,14 @@ def _register_handlers(doc):
             h = atomes_MouseHandler(doc)
             ctrl.addMouseClickHandler(h)
             _mouse_handlers[key] = h
+
+        if key not in _key_handlers:
+            try:
+                hk = atomes_KeyHandler(doc)
+                ctrl.addKeyHandler(hk)
+                _key_handlers[key] = hk
+            except Exception as e:
+                print(f"Erreur ajout KeyHandler: {e}")
 
     except Exception as e:
        print(f"Erreur dans _register_handlers : {e}")
