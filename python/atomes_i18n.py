@@ -59,6 +59,8 @@ STRINGS = {
         # Version check
         "atomes_not_found":      "L'exécutable 'atomes' est introuvable ou ne peut pas être lancé.\nVeuillez installer atomes (≥ 1.3.0) avant d'utiliser cette extension.",
         "atomes_version_too_old": "La version d'atomes installée ({}) est trop ancienne.\nLa version minimale requise est la 1.3.0.\nVeuillez mettre à jour atomes avant d'utiliser cette extension.",
+        "confirm_delete_title":  "Confirmer la suppression",
+        "confirm_delete_msg":    "Voulez-vous vraiment supprimer cette image et le fichier projet atomes qui y est associé dans le document ?",
           },
     "en": {
         "insert_title":        "Insert an atomes project file",
@@ -108,6 +110,8 @@ STRINGS = {
         # Version check
         "atomes_not_found":       "The 'atomes' executable cannot be found or launched.\nPlease install atomes (≥ 1.3.0) before using this extension.",
         "atomes_version_too_old": "The installed version of atomes ({}) is too old.\nThe minimum required version is 1.3.0.\nPlease update atomes before using this extension.",
+        "confirm_delete_title":  "Confirm deletion",
+        "confirm_delete_msg":    "Are you sure you want to delete this image and its associated atomes project file from the document?",
          },
 }
 

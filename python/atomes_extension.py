@@ -41,6 +41,7 @@ from com.sun.star.embed import ElementModes
 from com.sun.star.beans import PropertyValue
 from com.sun.star.ui import XContextMenuInterceptor
 from com.sun.star.document import XDocumentEventListener
+from com.sun.star.frame import XDispatchProviderInterceptor, XDispatch
 from com.sun.star.ui.ContextMenuInterceptorAction import IGNORED, EXECUTE_MODIFIED
 
 try:
@@ -85,6 +86,7 @@ from atomes_info import (
 # Session-level references (prevent GC)
 _mouse_handlers   = {}
 _ctx_interceptors = {}
+_dispatch_interceptors = {}
 # ── Caches session pour le stockage pérenne (mode zip) ──
 _atomes_file_cache = {}   # {doc_url: {stored_name: bytes_data}}
 _post_save_listeners = {} # {doc_url: atomes_PostSaveListener}
@@ -779,6 +781,83 @@ class atomes_ContextMenuInterceptor(unohelper.Base, XContextMenuInterceptor):
             return IGNORED
 
 
+class atomes_DeleteDispatch(unohelper.Base, XDispatch):
+    def __init__(self, master_dispatch, doc):
+        self.master_dispatch = master_dispatch
+        self.doc = doc
+
+    def dispatch(self, url, args):
+        try:
+            shape = _get_selected_atomes_shape_from_selection(self.doc)
+            if shape:
+                unique_name = shape.Name.split("_", 1)[1] if "_" in shape.Name else None
+                desc = shape.Description or ""
+                is_link = desc.startswith(atomes_LINK_PREFIX)
+                mode = _get_storage_mode(self.doc)
+                
+                if not is_link and mode != "external":
+                    toolkit = _lo_ctx().ServiceManager.createInstance("com.sun.star.awt.Toolkit")
+                    frame = self.doc.getCurrentController().getFrame()
+                    peer = frame.getContainerWindow() if frame else None
+                    from com.sun.star.awt.MessageBoxType import QUERYBOX
+                    from com.sun.star.awt.MessageBoxButtons import BUTTONS_YES_NO
+                    box = toolkit.createMessageBox(peer, QUERYBOX, BUTTONS_YES_NO, _("confirm_delete_title"), _("confirm_delete_msg"))
+                    res = box.execute()
+                    box.dispose()
+                    if res != 2: # 2 = YES
+                        return
+                    
+                    if unique_name:
+                        _remove_embedded_file_persistent(self.doc, unique_name)
+        except Exception as e:
+            print(f"Erreur atomes_DeleteDispatch: {e}")
+            traceback.print_exc()
+
+        if self.master_dispatch:
+            self.master_dispatch.dispatch(url, args)
+
+    def addStatusListener(self, ctrl, url):
+        if self.master_dispatch:
+            self.master_dispatch.addStatusListener(ctrl, url)
+
+    def removeStatusListener(self, ctrl, url):
+        if self.master_dispatch:
+            self.master_dispatch.removeStatusListener(ctrl, url)
+
+
+class atomes_DispatchProviderInterceptor(unohelper.Base, XDispatchProviderInterceptor):
+    def __init__(self, doc):
+        self.doc = doc
+        self.master = None
+        self.slave = None
+
+    def queryDispatch(self, url, target, flags):
+        if url.Complete in (".uno:Delete", ".uno:Cut"):
+            shape = _get_selected_atomes_shape_from_selection(self.doc)
+            if shape:
+                master_dispatch = self.slave.queryDispatch(url, target, flags) if self.slave else None
+                return atomes_DeleteDispatch(master_dispatch, self.doc)
+                
+        if self.slave:
+            return self.slave.queryDispatch(url, target, flags)
+        return None
+
+    def queryDispatches(self, requests):
+        return tuple([self.queryDispatch(req.FeatureURL, req.FrameName, req.SearchFlags) for req in requests])
+
+    def getMasterDispatchProvider(self):
+        return self.master
+
+    def setMasterDispatchProvider(self, master):
+        self.master = master
+
+    def getSlaveDispatchProvider(self):
+        return self.slave
+
+    def setSlaveDispatchProvider(self, slave):
+        self.slave = slave
+
+
 def _register_handlers(doc):
     """Register session-level mouse + context-menu handlers."""
     if doc is None:
@@ -789,6 +868,18 @@ def _register_handlers(doc):
         if ctrl is None:
             print("Contrôleur introuvable.")
             return
+
+        if key not in _dispatch_interceptors:
+            di = atomes_DispatchProviderInterceptor(doc)
+            try:
+                frame = ctrl.getFrame()
+                if frame:
+                    frame.registerDispatchProviderInterceptor(di)
+                    _dispatch_interceptors[key] = di
+                    print("Dispatch interceptor enregistré.")
+            except Exception as e:
+                print(f"Erreur enregistrement intercepteur dispatch : {e}")
+                traceback.print_exc()
 
         if key not in _ctx_interceptors:
             i = atomes_ContextMenuInterceptor(doc)
