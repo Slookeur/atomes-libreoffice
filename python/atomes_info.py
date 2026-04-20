@@ -53,22 +53,25 @@ import tempfile
 # et nom de la commande pour lancer l'application sous Linux
 atomes = "atomes"
 
+# URL inversée
+atomes_rURL = "fr.ipcms.atomes"
+
 # Identifiant principal de l'extension (correspond à <identifier> dans description.xml
 # et à getPackageLocation() dans le code Python)
-atomes_EXTENSION_ID = "fr.ipcms.atomes.extension"
+atomes_EXTENSION_ID = atomes_rURL + ".extension"
 
 # Identifiant UNO du service principal (déclenché par les entrées de menu dans Addons.xcu)
 # Correspond à g_ImplementationHelper.addImplementation(...) dans atomes_service.py
 # et à <value>service:fr.ipcms.atomes.atomesService?insert</value> dans Addons.xcu
-atomes_SERVICE_ID = "fr.ipcms.atomes.atomesService"
+atomes_SERVICE_ID = atomes_rURL + ".atomesService"
 
 # Identifiant UNO du job OnLoad (déclenché automatiquement à l'ouverture d'un document)
 # Correspond à <value>fr.ipcms.atomes.atomesJob</value> dans Jobs.xcu
-atomes_JOB_ID = "fr.ipcms.atomes.atomesJob"
+atomes_JOB_ID = atomes_rURL + ".atomesJob"
 
 # Nom du nœud de menu dans Addons.xcu (oor:name du nœud OfficeMenuBar)
 # Utilisé uniquement dans Addons.xcu, documenté ici pour référence
-atomes_MENU_NODE_ID = "fr.ipcms.atomes.extension.menu"
+atomes_MENU_NODE_ID = atomes_rURL + ".extension.menu"
 
 
 # ══════════════════════════════════════════════════════════════════════
