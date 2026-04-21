@@ -13,7 +13,7 @@
         </prop>
         <node oor:name="Submenu">
           <!-- Numbering is mandatory in name -->
-          <node oor:name="Element-001" oor:op="replace">
+          <node oor:name="atomes-Element-001" oor:op="replace">
             <prop oor:name="Title" oor:type="xs:string">
               <value xml:lang="fr">Insérer un fichier</value>
               <value xml:lang="en">Insert a file</value>
@@ -23,7 +23,7 @@
               <value>service:fr.ipcms.atomes.atomesService?insert</value>
             </prop>
           </node>
-          <node oor:name="Element-002" oor:op="replace">
+          <node oor:name="atomes-Element-002" oor:op="replace">
             <prop oor:name="Title" oor:type="xs:string">
               <value xml:lang="fr">Ouvrir un fichier</value>
               <value xml:lang="en">Open a file</value>
@@ -34,13 +34,13 @@
             </prop>
           </node>
           <!-- ── Séparateur ajouté pour le dialogue d'options ── -->
-          <node oor:name="Element-003" oor:op="replace">
+          <node oor:name="atomes-Element-003" oor:op="replace">
             <prop oor:name="URL" oor:type="xs:string">
               <value>private:separator</value>
             </prop>
           </node>
           <!-- ── Entrée de menu Options ajoutée ── -->
-          <node oor:name="Element-004" oor:op="replace">
+          <node oor:name="atomes-Element-004" oor:op="replace">
             <prop oor:name="Title" oor:type="xs:string">
               <value xml:lang="fr">Options</value>
               <value xml:lang="en">Options</value>

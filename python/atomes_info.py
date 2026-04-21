@@ -84,7 +84,16 @@ atomes_MENU_NODE_ID = atomes_rURL + ".extension.menu"
 
 # Nom de l'exécutable tel qu'accessible dans le PATH
 if sys.platform == 'win32':
-    atomes_EXECUTABLE = atomes + ".exe"
+    win_paths = [
+            "C:/Program Files/Atomes/bin/atomes.exe",
+            "C:/Program Files/atomes/bin/atomes.exe",
+            "atomes.exe"
+            ]
+    atomes_EXECUTABLE = "C:/Program Files/Atomes/bin/atomes.exe"
+    for p in win_paths:
+        if os.path.exists(p):
+            atomes_EXECUTABLE = p
+            break;
 elif sys.platform == 'darwin':
     # Cherche d'abord dans le PATH (si LibreOffice a été lancé depuis un terminal)
     if shutil.which(atomes):
