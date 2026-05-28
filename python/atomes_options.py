@@ -253,7 +253,7 @@ def show_options(*args):
     lbl_int.MultiLine = True
 
     # Bouton Avancé
-    btn_adv = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_advanced", 60, 110, 60, 18, "Avancé...")
+    btn_adv = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_advanced", 60, 110, 60, 18, "options_advanced")
     btn_adv.Enabled = True
 
     # Bouton Annuler

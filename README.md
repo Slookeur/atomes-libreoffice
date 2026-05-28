@@ -102,6 +102,17 @@ you can work with this interface as with the standard one, perform calculation, 
 <img width="500" src="img/img-5-saved.png" alt="live update of the atomes project file embedded in a LibreOffice Writer document" align="center">
 </p>
 
+### Accessing the extension options
+
+In the extension menu select the *options* item, the options dialog offers to swith between internal and external storage for the **atomes** project files. 
+It it also possible to configure the mode of internal storage. 
+Please note that on pressing apply the storage mode of the **atomes** project(s) that could be inserted in your LibreOffice document will be changed, 
+and if required internal document(s) extraced on the hard drive or vice versa. 
+
+<p align="center">
+<img width="500" src="img/img-6-options.png" alt="options of the atomes extension for LibreOffice" align="center">
+</p>
+
 
 ## Who's behind ***atomes*** (and this extension)
 
