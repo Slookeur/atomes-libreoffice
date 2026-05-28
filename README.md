@@ -11,7 +11,8 @@ Download the file [atomes_extension.oxt][atomes_extension] that contains the ext
 
 ### Using [LibreOffice][libreoffice]
 
-Open [LibreOffice][libreoffice], press `Ctrl+Alt+E` (to open the extension manager), then browse to select the file `atomes_extension.oxt` and install. 
+Open [LibreOffice][libreoffice], press `Ctrl+Alt+E` or browse the *Tools* menu and select the *Extensions...* item,
+to open the extension manager dialog, then browse to select the file `atomes_extension.oxt` and install it. 
 
 ### Using the terminal
 
