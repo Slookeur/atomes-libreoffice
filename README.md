@@ -67,6 +67,9 @@ The extension allows:
 
 ### Inserting an **atomes** project in a LibreOffice document
 
+To insert an **atomes** project in your LibreOffice document select the *Insert File* option in the extension menu. 
+A dialog box will open to help your browse your hard drive to select the **atomes** project to insert: 
+
 <p align="center">
 <img width="400" src="img/img-2-opening.png" alt="Inserting atomes project file in LibreOffice Writer" align="center">
 </p>
@@ -83,7 +86,7 @@ or via a symbolic link to the orginal **atomes** project file. Note that is poss
 
 ### Editing an **atomes** project embedded in a LibreOffice document
 
-Use the extension menu and select *Open a file*, if only one **atomes** project file happens to be embedded in the document this file 
+Use the extension menu and select *Open File*, if only a single **atomes** project file happens to be embedded in the document this file 
 will be opened immediately otherwise you will be ask to select the projet to open. Alternatively simply double click on the image corresponding to the project
 you want to open, that does the trick:
 
@@ -104,7 +107,7 @@ you can work with this interface as with the standard one, perform calculation, 
 
 ### Accessing the extension options
 
-In the extension menu select the *options* item, the options dialog offers to swith between internal and external storage for the **atomes** project files. 
+In the extension menu select the *Options* item, the options dialog offers to swith between internal and external storage for the **atomes** project files. 
 It it also possible to configure the mode of internal storage. 
 Please note that on pressing apply the storage mode of the **atomes** project(s) that could be inserted in your LibreOffice document will be changed, 
 and if required internal document(s) extraced on the hard drive or vice versa. 

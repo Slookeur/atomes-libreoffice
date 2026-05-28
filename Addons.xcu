@@ -15,9 +15,9 @@
           <!-- Numbering is mandatory in name -->
           <node oor:name="atomes-Element-001" oor:op="replace">
             <prop oor:name="Title" oor:type="xs:string">
-              <value xml:lang="fr">Insérer un fichier</value>
-              <value xml:lang="en">Insert a file</value>
-              <value>Insert a file</value>
+              <value xml:lang="fr">Insérer un Fichier</value>
+              <value xml:lang="en">Insert File</value>
+              <value>Insert File</value>
             </prop>
             <prop oor:name="URL" oor:type="xs:string">
               <value>service:fr.ipcms.atomes.atomesService?insert</value>
@@ -25,9 +25,9 @@
           </node>
           <node oor:name="atomes-Element-002" oor:op="replace">
             <prop oor:name="Title" oor:type="xs:string">
-              <value xml:lang="fr">Ouvrir un fichier</value>
-              <value xml:lang="en">Open a file</value>
-              <value>Open a file</value>
+              <value xml:lang="fr">Ouvrir un Fichier</value>
+              <value xml:lang="en">Open File</value>
+              <value>Open File</value>
             </prop>
             <prop oor:name="URL" oor:type="xs:string">
              <value>service:fr.ipcms.atomes.atomesService?open</value>
