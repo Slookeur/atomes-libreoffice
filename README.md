@@ -82,7 +82,7 @@ Once inserted in the LibreOffice document the **atomes** project is represented 
 
 You can move around, resize, reshape this image as any LibreOffice image. The **atomes** project is now embedded in the LibreOffice document, 
 not that depending on your options the insertion might be done by direct embedding (a copy of the **atomes** project is inserted in the LibreOffice document zip archive), 
-or via a symbolic link to the orginal **atomes** project file. Note that is possible to swith between embedding modes at any time using the extension options (see below). 
+or via a symbolic link to the orginal **atomes** project file. Note that it is possible to swith between embedding modes at any time using the extension options (see below). 
 
 ### Editing an **atomes** project embedded in a LibreOffice document
 
@@ -94,6 +94,7 @@ you want to open, that does the trick:
 <img width="500" src="img/img-4-edit.png" alt="open an atomes project embedded in a LibreOffice Writer document" align="center">
 </p>
 
+This will open the embedded project using **atomes** only at least version **1.3.0** is found on your computer. 
 Althought some restrictions are applied to this embedded version of **atomes**, for instance it is possible to create/open other project, 
 you can work with this interface as with the standard one, perform calculation, change the visual aspect ... 
 
