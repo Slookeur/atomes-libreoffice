@@ -158,7 +158,7 @@ def show_advanced_dialog(doc):
     ctx = _lo_ctx()
     smgr = ctx.ServiceManager
     current = _get_internal_mode(doc)
-    dm = _create_dialog_model(smgr, 190, 142, "advanced_embedded")
+    dm = _create_dialog_model(smgr, 210, 142, "advanced_embedded")
 
      # Label titre
     lbl = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_title", 12, 10, 130, 14, "advanced_label")
@@ -173,7 +173,7 @@ def show_advanced_dialog(doc):
     rb_zip = _create_dialog_object(dm, "com.sun.star.awt.UnoControlRadioButtonModel", "rb_zip", 10, 69, 170, 14, "odf_archive")
     rb_zip.State = 1 if current == "zip" else 0
 
-    lbl_z = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_z", 20, 83, 160, 24, "large_files")
+    lbl_z = _create_dialog_object(dm, "com.sun.star.awt.UnoControlFixedTextModel", "lbl_z", 20, 83, 180, 24, "large_files")
     lbl_z.MultiLine = True
 
     btn_cancel = _create_dialog_object(dm, "com.sun.star.awt.UnoControlButtonModel", "btn_cancel", 30, 120, 50, 18, "cancel")
