@@ -95,8 +95,8 @@ you want to open, that does the trick:
 <img width="500" src="img/img-4-edit.png" alt="open an atomes project embedded in a LibreOffice Writer document" align="center">
 </p>
 
-This will open the embedded project using **atomes** only at least version **1.3.0** is found on your computer. 
-Althought some restrictions are applied to this embedded version of **atomes**, for instance it is possible to create/open other project, 
+This will open the embedded project using **atomes** only if at least version **1.3.0** is found on your computer. 
+Althought some restrictions are applied to this embedded version of **atomes**, for instance it is not possible to create/open other project, 
 you can work with this interface as with the standard one, perform calculation, change the visual aspect ... 
 
 > [!IMPORTANT]
@@ -111,8 +111,8 @@ you can work with this interface as with the standard one, perform calculation, 
 
 In the extension menu select the *Options* item, the options dialog offers to swith between internal and external storage for the **atomes** project files. 
 It it also possible to configure the mode of internal storage. 
-Please note that on pressing apply the storage mode of the **atomes** project(s) that could be inserted in your LibreOffice document will be changed, 
-and if required internal document(s) extraced on the hard drive or vice versa. 
+
+If you decide to change the storage mode, then please note that on pressing *Apply* the storage mode of all **atomes** project(s) that could be inserted in your LibreOffice document will be modified accordingly, if required internal document(s) could be extraced on the hard drive or vice versa. 
 
 <p align="center">
 <img width="500" src="img/img-6-options.png" alt="options of the atomes extension for LibreOffice" align="center">
