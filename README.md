@@ -96,7 +96,7 @@ you want to open, that does the trick:
 </p>
 
 This will open the embedded project using **atomes** only if at least version **1.3.0** is found on your computer. 
-Althought some restrictions are applied to this embedded version of **atomes**, for instance it is not possible to create/open other project, 
+Although some restrictions are applied to this embedded version of **atomes**, for instance it is not possible to create/open other project, 
 you can work with this interface as with the standard one, perform calculation, change the visual aspect ... 
 
 > [!IMPORTANT]
