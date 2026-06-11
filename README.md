@@ -83,7 +83,7 @@ Once inserted in the LibreOffice document the **atomes** project is represented 
 
 You can move around, resize, reshape this image as any LibreOffice image. The **atomes** project is now embedded in the LibreOffice document, 
 not that depending on your options the insertion might be done by direct embedding (a copy of the **atomes** project is inserted in the LibreOffice document zip archive), 
-or via a symbolic link to the orginal **atomes** project file. Note that it is possible to swith between embedding modes at any time using the extension options (see below). 
+or via a symbolic link to the original **atomes** project file. Note that it is possible to switch between embedding modes at any time using the extension options (see below). 
 
 ### Editing an **atomes** project embedded in a LibreOffice document
 
@@ -100,7 +100,7 @@ Althought some restrictions are applied to this embedded version of **atomes**, 
 you can work with this interface as with the standard one, perform calculation, change the visual aspect ... 
 
 > [!IMPORTANT]
-> The work done on the project file uisng this embedded version of **atomes** will be automatically saved after closing, and the image inserted in the LibreOffice document will be updated accordingly.
+> The work done on the project file using this embedded version of **atomes** will be automatically saved after closing, and the image inserted in the LibreOffice document will be updated accordingly.
 > The project file will be modified meaning that if the embedded is done via symbolic link then the original file will be modified ! 
 
 <p align="center">
@@ -109,10 +109,10 @@ you can work with this interface as with the standard one, perform calculation, 
 
 ### Accessing the extension options
 
-In the extension menu select the *Options* item, the options dialog offers to swith between internal and external storage for the **atomes** project files. 
+In the extension menu select the *Options* item, the options dialog offers to switch between internal and external storage for the **atomes** project files. 
 It it also possible to configure the mode of internal storage. 
 
-If you decide to change the storage mode, then please note that on pressing *Apply* the storage mode of all **atomes** project(s) that could be inserted in your LibreOffice document will be modified accordingly, if required internal document(s) could be extraced on the hard drive or vice versa. 
+If you decide to change the storage mode, then please note that on pressing *Apply* the storage mode of all **atomes** project(s) that could be inserted in your LibreOffice document will be modified accordingly, if required internal document(s) could be extracted on the hard drive or vice versa. 
 
 <p align="center">
 <img width="1000" src="img/img-6-options.png" alt="options of the atomes extension for LibreOffice" align="center">
