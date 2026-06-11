@@ -101,7 +101,7 @@ you can work with this interface as with the standard one, perform calculation, 
 
 > [!IMPORTANT]
 > The work done on the project file using this embedded version of **atomes** will be automatically saved after closing, and the image inserted in the LibreOffice document will be updated accordingly.
-> The project file will be modified meaning that if the embedded is done via symbolic link then the original file will be modified ! 
+> The project file will be modified, meaning that if the embedded is done via symbolic link then the target file will be modified ! 
 
 <p align="center">
 <img width="1000" src="img/img-5-saved.png" alt="live update of the atomes project file embedded in a LibreOffice Writer document" align="center">
